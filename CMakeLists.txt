@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10.0)
 project(uav_ros_tracker)
 
-find_package(catkin REQUIRED COMPONENTS roscpp dynamic_reconfigure uav_ros_util)
+find_package(catkin REQUIRED COMPONENTS roscpp dynamic_reconfigure uav_ros_lib)
 
 catkin_package(INCLUDE_DIRS include LIBRARIES CATKIN_DEPENDS)
 

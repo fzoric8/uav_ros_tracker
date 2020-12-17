@@ -2,7 +2,7 @@
 <package>
   <name>uav_ros_tracker</name>
   <version>0.0.0</version>
-  <description>Repository containing controllers for UAV simulations in ROS.</description>
+  <description>The main reference generator for the "uav_ros_stack" package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <!-- Example:  -->
@@ -17,14 +17,14 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depend>uav_ros_control_msgs</build_depend>
+  <build_depend>uav_ros_msgs</build_depend>
   <build_depend>geographiclib</build_depend>
   <build_depend>geographiclib-tools</build_depend>
   <build_depend>mavros</build_depend>
 
   <run_depend>geographiclib</run_depend>
   <run_depend>geographiclib-tools</run_depend>
-  <run_depend>uav_ros_control_msgs</run_depend>
+  <run_depend>uav_ros_msgs</run_depend>
   <run_depend>mavros</run_depend>
   
   <!-- The export tag contains other, unspecified, tags -->

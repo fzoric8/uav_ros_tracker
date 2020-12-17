@@ -2,7 +2,7 @@
 
 #include <eigen3/Eigen/Eigen>
 #include <uav_ros_tracker/cvx_wrapper.h>
-#include <uav_ros_util/ros_util.hpp>
+#include <uav_ros_lib/ros_util.hpp>
 
 using namespace Eigen;
 
