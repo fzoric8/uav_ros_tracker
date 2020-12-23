@@ -1,0 +1,18 @@
+topp_tracker:
+  sampling_frequency: 100
+  n_gridpoints: 500
+  request_permission: True
+  
+  constraints:
+
+    velocity:
+      x: 1.5
+      y: 1.5
+      z: 1.5
+      yaw: 0.5
+
+    acceleration:
+      x: 0.25
+      y: 0.25
+      z: 0.25
+      yaw: 0.01
