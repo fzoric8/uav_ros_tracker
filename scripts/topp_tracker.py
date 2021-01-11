@@ -10,7 +10,7 @@ from std_msgs.msg import Bool
 from topp_ros.srv import GenerateTrajectory, GenerateTrajectoryRequest
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint, \
     MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
-from geometry_msgs.msg import Transform, Twist
+from geometry_msgs.msg import Transform, Twist, PoseStamped
 from nav_msgs.msg import Path
 from std_srvs.srv import Empty
 from std_srvs.srv import EmptyResponse
@@ -55,8 +55,9 @@ class ToppTracker:
 
         self.point_index = 0
         self.trajectory = MultiDOFJointTrajectory()
-        self.pose_sub = rospy.Subscriber("topp/input_trajectory", MultiDOFJointTrajectory, self.trajectory_cb)
-        
+        self.traj_sub = rospy.Subscriber("topp/input_trajectory", MultiDOFJointTrajectory, self.trajectory_cb)
+        self.pose_sub = rospy.Subscriber("topp/input_pose", PoseStamped, self.pose_cb)
+
         self.carrot_status = String()
         self.carrot_status.data = "HOLD"
         self.status_sub = rospy.Subscriber("carrot/status", String, self.status_cb)
@@ -140,13 +141,34 @@ class ToppTracker:
             
         return x, y, z, yaw
 
+    def pose_cb(self, msg):
+
+        # Fill 
+        temp_traj = MultiDOFJointTrajectory()
+        temp_traj.header = msg.header
+        temp_traj.points = []
+        temp_traj.points.append(MultiDOFJointTrajectoryPoint())
+        temp_traj.points[0].transforms = []
+        temp_traj.points[0].transforms.append(Transform())
+        temp_traj.points[0].transforms[0].translation.x = msg.pose.position.x
+        temp_traj.points[0].transforms[0].translation.y = msg.pose.position.y
+        temp_traj.points[0].transforms[0].translation.z = msg.pose.position.z
+        temp_traj.points[0].transforms[0].rotation.x = msg.pose.orientation.x
+        temp_traj.points[0].transforms[0].rotation.y = msg.pose.orientation.y
+        temp_traj.points[0].transforms[0].rotation.z = msg.pose.orientation.z
+        temp_traj.points[0].transforms[0].rotation.w = msg.pose.orientation.w        
+
+        # Call trajectory callback with one point
+        self.trajectory_cb(temp_traj)
+        
+
     def trajectory_cb(self, msg):
         if len(msg.points) == 0:
             print("ToppTracker - empty input trajectory recieved, RESET")
             self.trajectory = MultiDOFJointTrajectory()
             return
         
-        if (not self.carrot_trajectory_recieved):
+        if not self.carrot_trajectory_recieved:
             print("ToppTracker - trajectory recieved but carrot unavailable")
             self.trajectory = MultiDOFJointTrajectory()
             return
@@ -269,27 +291,27 @@ class ToppTracker:
                 rospy.loginfo_throttle(1.0, "ToppTracker - Carrot trajectory unavailable")
                 self.publish_tracker_status(TrackerStatus.off)
                 self.enable_trajectory = False
-                rospy.sleep(0.01)
+                rospy.sleep(self.rate)
                 continue
 
             if not self.carrot_status.data == "HOLD":
                 rospy.loginfo_throttle(1.0, "ToppTracker - Position hold disabled")
                 self.publish_tracker_status(TrackerStatus.off)
                 self.enable_trajectory = False
-                rospy.sleep(0.01)
+                rospy.sleep(self.rate)
                 continue
             
             if not self.trajectory.points:
                 rospy.loginfo_throttle(1.0, "ToppTracker - No trajectory available")
                 self.publish_tracker_status(TrackerStatus.accept)
                 self.enable_trajectory = False
-                rospy.sleep(0.01)
+                rospy.sleep(self.rate)
                 continue
                 
             if self.tracker_params.request_permission and not self.enable_trajectory:
                 rospy.loginfo_throttle(1.0, "ToppTracker - Do not have a permission to publish trajectory.")
                 self.publish_tracker_status(TrackerStatus.wait)
-                rospy.sleep(0.01)
+                rospy.sleep(self.rate)
                 continue
 
             # Publish trajectory point

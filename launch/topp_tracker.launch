@@ -10,7 +10,7 @@
         output="screen" ns="$(arg namespace)"/>
 
     <!-- Trajectory point publisher -->
-    <node name="toppra_uav_ros_tracker" pkg="topp_ros" type="topp_tracker.py" 
+    <node name="toppra_uav_ros_tracker" pkg="uav_ros_tracker" type="topp_tracker.py" 
         ns="$(arg namespace)" output="screen">
         <remap from="input/trajectory" to="$(arg input_trajectory)"/>
         <remap from="output/point" to="$(arg output_point)"/>
