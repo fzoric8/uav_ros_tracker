@@ -21,5 +21,5 @@ This reference generator uses [topp_ros](https://github.com/larics/topp_ros) and
 
 Launch TOPP Tracker with a default configuration as follows:
 ```bash
-export UAV_NAMESPACE=red; roslaunch uav_ros_tracker topp_tracker.launchp
+export UAV_NAMESPACE=red; roslaunch uav_ros_tracker topp_tracker.launch
 ```
