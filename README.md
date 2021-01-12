@@ -11,11 +11,11 @@ The main trajectory reference generator package of the [uav_ros_stack](https://g
 ## TOPP Tracker
 
 This reference generator uses [topp_ros](https://github.com/larics/topp_ros) and [toppra](https://github.com/hungpham2511/toppra) to generate trajectory points based on:  
-* *topp/input_trajectory* 
+* **topp/input_trajectory** 
   * ```trajectory_msgs/MultiDOFTrajectory```
   * Points from which a trajectory is generated
 
-* *topp/input_pose*
+* **topp/input_pose**
   * ```geometry_msgs/PoseStamped```
   * A trajectory from current reference to the given pose is generated
 
