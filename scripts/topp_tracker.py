@@ -322,4 +322,7 @@ class ToppTracker:
 if __name__ == "__main__":
     rospy.init_node("uav_ros_tracker")   
     tracker = ToppTracker()
-    tracker.run()
+    try:
+        tracker.run()
+    except rospy.ROSInterruptException:
+        pass
