@@ -1,0 +1,11 @@
+<launch>
+  <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
+  <arg name="tracker_config" default="$(find uav_ros_tracker)/config/mpc_tracker_config.yaml"/>
+
+  <!-- mpc_tracker node -->
+  <node name="mpc_tracker" pkg="uav_ros_tracker" type="mpc_tracker" 
+      output="screen" ns="$(arg namespace)">
+    <rosparam file="$(arg tracker_config)" command="load"/>
+  </node>
+
+</launch>
