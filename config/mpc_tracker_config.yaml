@@ -1,3 +1,4 @@
+# Parameters for mpc_tracker from https://github.com/ctu-mrs/mrs_uav_trackers
 rate: 100.0
 
 model:
@@ -47,3 +48,25 @@ model:
         0,
         0,
         0.01]
+
+solver:
+
+  horizon_len: 40 # Horizon length is hardcoded in solver code, this value is used in other parts of the code
+
+  # dt1: 0.01 # dt1 is set as 1/main_rate
+  dt2: 0.2
+
+  xy:
+    verbose: true
+    max_iterations: 25 # default: 25
+    Q: [5000, 0, 0, 0]
+
+  z:
+    verbose: true
+    max_iterations: 25 # default: 25
+    Q: [5000, 0, 0, 0]
+
+  heading:
+    verbose: true
+    max_iterations: 25 # default: 25
+    Q: [5000, 0, 0, 0]
