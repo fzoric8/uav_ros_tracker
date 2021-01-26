@@ -23,3 +23,7 @@ Launch TOPP Tracker with a default configuration as follows:
 ```bash
 export UAV_NAMESPACE=red; roslaunch uav_ros_tracker topp_tracker.launch
 ```
+
+## MPC Tracker
+
+Implementation as found at [ctu-mrs/mrs_uav_trackers](https://github.com/ctu-mrs/mrs_uav_trackers).
