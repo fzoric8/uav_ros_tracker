@@ -47,9 +47,9 @@ public:
     m_solver_y = std::make_unique<uav_ros_trackers::cvx_wrapper::CvxWrapper>(
       false, m_max_iter_xy, m_Q_xy, m_dt1, m_dt2, 1);
     m_solver_z = std::make_unique<uav_ros_trackers::cvx_wrapper::CvxWrapper>(
-      false, m_max_iter_xy, m_Q_xy, m_dt1, m_dt2, 2);
+      false, m_max_iter_z, m_Q_z, m_dt1, m_dt2, 2);
     m_solver_heading = std::make_unique<uav_ros_trackers::cvx_wrapper::CvxWrapper>(
-      false, m_max_iter_z, m_Q_z, m_dt1, m_dt2, 0);
+      false, m_max_iter_heading, m_Q_heading, m_dt1, m_dt2, 0);
 
     // Initialize mpc states
     m_mpc_state = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
@@ -72,17 +72,21 @@ public:
     m_is_trajectory_tracking = false;
     m_is_initialized = false;
 
+    // Initialize subscribers
+    m_odom_sub = m_nh.subscribe("odometry", 1, &MPCTracker::odom_callback, this);
+    m_pose_sub = m_nh.subscribe("pose_input", 1, &MPCTracker::pose_callback, this);
+    m_traj_sub =
+      m_nh.subscribe("trajectory_input", 1, &MPCTracker::trajectory_callback, this);
+
+    // Initialize publishers
+    m_traj_point_pub = m_nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>(
+      "position_command", 1);
+
     // Initialize timers
     m_mpc_iteration_timer =
       m_nh.createTimer(ros::Rate(m_tracker_rate), &MPCTracker::mpc_iteration, this);
     m_tracking_timer =
       m_nh.createTimer(ros::Rate(1.0), &MPCTracker::tracking_timer, this, false, false);
-
-    // Initialize subscribers
-    m_odom_sub = m_nh.subscribe("odometry", 1, &MPCTracker::odom_callback, this);
-    m_pose_sub = m_nh.subscribe("pose_ref", 1, &MPCTracker::pose_callback, this);
-    m_traj_sub =
-      m_nh.subscribe("trajectory_ref", 1, &MPCTracker::trajectory_callback, this);
   }
 
 private:
@@ -117,6 +121,76 @@ private:
     if (m_is_trajectory_tracking) { interpolate_trajectory(); }
 
     calculate_mpc();
+    iterate_model();
+    publish_trajectory_point();
+  }
+
+  void publish_trajectory_point()
+  {
+    // Check if the states are finite
+    bool is_state_finite = true;
+    for (int i = 0; i < m_trans_state_count; i++) {
+      if (!std::isfinite(m_mpc_state(i, 0))) { is_state_finite = false; }
+    }
+
+    // Construct the point command
+    trajectory_msgs::MultiDOFJointTrajectoryPoint trajectory_point_ref =
+      ros_convert::to_trajectory_point(m_curr_odom.pose.pose.position.x,
+        m_curr_odom.pose.pose.position.y,
+        m_curr_odom.pose.pose.position.z,
+        m_curr_odom.pose.pose.orientation.x,
+        m_curr_odom.pose.pose.orientation.y,
+        m_curr_odom.pose.pose.orientation.z,
+        m_curr_odom.pose.pose.orientation.w);
+
+    if (is_state_finite) {
+      // TODO: Make a msg to accomodate jerk commands
+      trajectory_point_ref.transforms.front().translation.x = m_mpc_state(0, 0);
+      trajectory_point_ref.velocities.front().linear.x = m_mpc_state(1, 0);
+      trajectory_point_ref.accelerations.front().linear.x = m_mpc_state(2, 0);
+
+      trajectory_point_ref.transforms.front().translation.y = m_mpc_state(4, 0);
+      trajectory_point_ref.velocities.front().linear.y = m_mpc_state(5, 0);
+      trajectory_point_ref.accelerations.front().linear.y = m_mpc_state(6, 0);
+
+      trajectory_point_ref.transforms.front().translation.z = m_mpc_state(8, 0);
+      trajectory_point_ref.velocities.front().linear.z = m_mpc_state(9, 0);
+      trajectory_point_ref.accelerations.front().linear.z = m_mpc_state(10, 0);
+    } else {
+      ROS_ERROR_THROTTLE(
+        1.0, "MPCTracker::publish_trajectory_point - MPC state is not finite.");
+      trajectory_point_ref.velocities.front().linear.x = 0;
+      trajectory_point_ref.accelerations.front().linear.x = 0;
+
+      trajectory_point_ref.velocities.front().linear.y = 0;
+      trajectory_point_ref.accelerations.front().linear.y = 0;
+
+      trajectory_point_ref.velocities.front().linear.z = 0;
+      trajectory_point_ref.accelerations.front().linear.z = 0;
+    }
+
+    // Check if the heading states are finite
+    bool is_heading_finite = true;
+    for (int i = 0; i < m_heading_state_count; i++) {
+      if (!std::isfinite(m_mpc_heading_state(i, 0))) { is_heading_finite = false; }
+    }
+
+    if (is_heading_finite) {
+      // TODO: Make a message to accomodate heading command
+      // TODO: Make a message to accomodate angular jerk commands
+      trajectory_point_ref.transforms.front().rotation =
+        ros_convert::calculate_quaternion(m_mpc_heading_state(0, 0));
+      trajectory_point_ref.velocities.front().angular.z = m_mpc_heading_state(1, 0);
+      trajectory_point_ref.accelerations.front().angular.z = m_mpc_heading_state(2, 0);
+    } else {
+      trajectory_point_ref.velocities.front().angular.z = 0;
+      trajectory_point_ref.accelerations.front().angular.z = 0;
+    }
+
+    // TODO: This message doesn't even have a timestamp WTF?!
+    // TODO: Make a trajectory point message with a timestamp in the header...
+
+    m_traj_point_pub.publish(trajectory_point_ref);
   }
 
   void calculate_mpc()
@@ -217,11 +291,18 @@ private:
 
     /* Do the heading MPC */
 
-    // TODO: unwrap the heading reference
+    // unwrap the heading reference
+    m_desired_traj_heading(0, 0) =
+      ros_convert::unwrap(m_desired_traj_heading(0, 0), m_mpc_heading_state(0));
+    for (int i = 1; i < m_horizon_len; i++) {
+      m_desired_traj_heading(i, 0) = ros_convert::unwrap(
+        m_desired_traj_heading(i, 0), m_desired_traj_heading(i - 1, 0));
+    }
 
     // Set heading solver inputs
     m_solver_heading->setVelQ(0);
     m_solver_heading->setInitialState(m_mpc_heading_state);
+    m_solver_heading->loadReference(m_desired_traj_heading);
     m_solver_heading->setLimits(MAX_SPEED_HEADING,
       -MAX_SPEED_HEADING,
       MAX_ACC_HEADING,
@@ -267,6 +348,78 @@ private:
         1.0, "MPCTracker::calculate_mpc  - saturating snap Z: " << m_mpc_state(2));
       m_mpc_state(2) = -MAX_SNAP_Z;
     }
+  }
+
+  void iterate_model()
+  {
+
+    if (m_is_model_first_iter) {
+
+      m_model_iterations_last_time = ros::Time::now();
+      m_is_model_first_iter = false;
+
+    } else {
+
+      double dt = (ros::Time::now() - m_model_iterations_last_time).toSec();
+
+      if (dt > 0.001 && dt < 2.0) {
+
+        // clang-format off
+        m_A  << 1, dt, 0.5*dt*dt, 0,         0, 0,  0,         0,         0, 0,  0,         0,
+              0, 1,  dt,        0.5*dt*dt, 0, 0,  0,         0,         0, 0,  0,         0,
+              0, 0,  1,         dt,        0, 0,  0,         0,         0, 0,  0,         0,
+              0, 0,  0,         1,         0, 0,  0,         0,         0, 0,  0,         0,
+              0, 0,  0,         0,         1, dt, 0.5*dt*dt, 0,         0, 0,  0,         0,
+              0, 0,  0,         0,         0, 1,  dt,        0.5*dt*dt, 0, 0,  0,         0,
+              0, 0,  0,         0,         0, 0,  1,         dt,        0, 0,  0,         0,
+              0, 0,  0,         0,         0, 0,  0,         1,         0, 0,  0,         0,
+              0, 0,  0,         0,         0, 0,  0,         0,         1, dt, 0.5*dt*dt, 0,
+              0, 0,  0,         0,         0, 0,  0,         0,         0, 1,  dt,        0.5*dt*dt,
+              0, 0,  0,         0,         0, 0,  0,         0,         0, 0,  1,         dt,
+              0, 0,  0,         0,         0, 0,  0,         0,         0, 0,  0,         1;
+
+        m_B  << 0,  0,  0,
+              0,  0,  0,
+              0,  0,  0,
+              dt, 0,  0,
+              0,  0,  0,
+              0,  0,  0,
+              0,  0,  0,
+              0,  dt, 0,
+              0,  0,  0,
+              0,  0,  0,
+              0,  0,  0,
+              0,  0,  dt;
+
+        m_A_heading  << 1, dt, 0.5*dt*dt, 0,
+                      0, 1,  dt,        0.5*dt*dt,
+                      0, 0,  1,         dt,
+                      0, 0,  0,         1;
+
+        m_B_heading  << 0,
+                      0,
+                      0,
+                      dt;
+
+        // clang-format on
+      } else {
+
+        m_A = m_A_orig;
+        m_B = m_B_orig;
+
+        m_A_heading = m_A_heading_orig;
+        m_B_heading = m_B_heading_orig;
+      }
+
+      m_model_iterations_last_time = ros::Time::now();
+    }
+
+
+    m_mpc_state = m_A * m_mpc_state + m_B * m_mpc_u;
+    m_mpc_heading_state =
+      m_A_heading * m_mpc_heading_state + m_B_heading * m_mpc_u_heading;
+
+    m_mpc_heading_state(0) = ros_convert::wrapMinMax(m_mpc_heading_state(0), -M_PI, M_PI);
   }
 
   void interpolate_trajectory()
@@ -512,27 +665,34 @@ private:
       nh_private, "model/translation/n_states", m_trans_state_count);
     param_util::getParamOrThrow(
       nh_private, "model/translation/n_inputs", m_trans_input_count);
-    m_A = param_util::loadMatrixOrThrow(
+    m_A_orig = param_util::loadMatrixOrThrow(
       nh_private, "model/translation/A", m_trans_state_count, m_trans_state_count);
-    m_B = param_util::loadMatrixOrThrow(
+    m_B_orig = param_util::loadMatrixOrThrow(
       nh_private, "model/translation/B", m_trans_state_count, m_trans_input_count);
+    m_A = m_A_orig;
+    m_B = m_B_orig;
 
     // Load heading parameters
     param_util::getParamOrThrow(
       nh_private, "model/heading/n_states", m_heading_state_count);
     param_util::getParamOrThrow(
       nh_private, "model/heading/n_inputs", m_heading_input_count);
-    m_A_heading = param_util::loadMatrixOrThrow(
+    m_A_heading_orig = param_util::loadMatrixOrThrow(
       nh_private, "model/heading/A", m_heading_state_count, m_heading_state_count);
-    m_B_heading = param_util::loadMatrixOrThrow(
+    m_B_heading_orig = param_util::loadMatrixOrThrow(
       nh_private, "model/heading/B", m_heading_state_count, m_heading_input_count);
+    m_A_heading = m_A_heading_orig;
+    m_B_heading = m_B_heading_orig;
 
     // Load solver parameters
     param_util::getParamOrThrow(nh_private, "solver/horizon_len", m_horizon_len);
     param_util::getParamOrThrow(nh_private, "solver/xy/max_iterations", m_max_iter_xy);
     param_util::getParamOrThrow(nh_private, "solver/z/max_iterations", m_max_iter_z);
+    param_util::getParamOrThrow(
+      nh_private, "solver/heading/max_iterations", m_max_iter_heading);
     param_util::getParamOrThrow(nh_private, "solver/xy/Q", m_Q_xy);
     param_util::getParamOrThrow(nh_private, "solver/z/Q", m_Q_z);
+    param_util::getParamOrThrow(nh_private, "solver/heading/Q", m_Q_heading);
     param_util::getParamOrThrow(nh_private, "solver/dt2", m_dt2);
   }
 
@@ -553,8 +713,10 @@ private:
   int m_horizon_len;
   int m_max_iter_xy;
   int m_max_iter_z;
+  int m_max_iter_heading;
   std::vector<double> m_Q_xy;
   std::vector<double> m_Q_z;
+  std::vector<double> m_Q_heading;
   double m_dt1;
   double m_dt2;
 
@@ -569,6 +731,14 @@ private:
   Eigen::MatrixXd m_B;
   Eigen::MatrixXd m_A_heading;
   Eigen::MatrixXd m_B_heading;
+
+  Eigen::MatrixXd m_A_orig;
+  Eigen::MatrixXd m_B_orig;
+  Eigen::MatrixXd m_A_heading_orig;
+  Eigen::MatrixXd m_B_heading_orig;
+
+  ros::Time m_model_iterations_last_time;
+  bool m_is_model_first_iter = true;
 
   /* Current state of the Virtual UAV */
   Eigen::MatrixXd m_mpc_state;
@@ -605,6 +775,9 @@ private:
   ros::Subscriber m_odom_sub;
   ros::Subscriber m_pose_sub;
   ros::Subscriber m_traj_sub;
+
+  /** Publishers **/
+  ros::Publisher m_traj_point_pub;
 };
 
 
