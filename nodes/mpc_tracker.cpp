@@ -4,6 +4,7 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
+#include <geometry_msgs/PoseArray.h>
 
 #include <uav_ros_tracker/cvx_wrapper.h>
 #include <uav_ros_lib/param_util.hpp>
@@ -67,7 +68,7 @@ public:
     m_predicted_trajectory =
       Eigen::MatrixXd::Zero(m_horizon_len * m_trans_state_count, 1);
     m_predicted_heading_trajectory =
-      Eigen::MatrixXd::Zero(m_horizon_len * m_heading_state_count, 1);
+      Eigen::MatrixXd::Zero(m_horizon_len * m_trans_state_count, 1);
 
     m_is_trajectory_tracking = false;
     m_is_initialized = false;
@@ -81,6 +82,12 @@ public:
     // Initialize publishers
     m_traj_point_pub = m_nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>(
       "position_command", 1);
+    m_mpc_desired_traj_pub =
+      m_nh.advertise<geometry_msgs::PoseArray>("debug/mpc_desired_trajectory", 1);
+    m_mpc_predicted_traj_pub =
+      m_nh.advertise<geometry_msgs::PoseArray>("debug/mpc_predicted_trajectory", 1);
+    m_processed_trajectory_pub =
+      m_nh.advertise<geometry_msgs::PoseArray>("debug/processed_trajectory", 1);
 
     // Initialize timers
     m_mpc_iteration_timer =
@@ -100,6 +107,7 @@ private:
       m_is_trajectory_tracking = false;
       m_trajectory_idx = m_trajectory_size - 1;
       m_tracking_timer.stop();
+      m_hover = true;
       ROS_INFO("MPCTracker::tracking_timer - trajectory tracking done");
     }
   }
@@ -348,6 +356,50 @@ private:
         1.0, "MPCTracker::calculate_mpc  - saturating snap Z: " << m_mpc_state(2));
       m_mpc_state(2) = -MAX_SNAP_Z;
     }
+
+    // Publish desired trajectory
+    geometry_msgs::PoseArray debug_trajectory_out;
+    debug_trajectory_out.header.stamp = ros::Time::now();
+    debug_trajectory_out.header.frame_id = "world";
+
+    for (int i = 0; i < m_horizon_len; i++) {
+
+      geometry_msgs::Pose new_pose;
+
+      new_pose.position.x = des_x_filtered(i, 0);
+      new_pose.position.y = des_y_filtered(i, 0);
+      new_pose.position.z = des_z_filtered(i, 0);
+
+      new_pose.orientation = ros_convert::calculate_quaternion(m_desired_traj_heading(i));
+
+      debug_trajectory_out.poses.push_back(new_pose);
+    }
+    m_mpc_desired_traj_pub.publish(debug_trajectory_out);
+    publish_predicted_trajectory();
+  }
+
+  void publish_predicted_trajectory()
+  {
+    // Publish predicted trajectory
+    geometry_msgs::PoseArray debug_trajectory_out;
+    debug_trajectory_out.header.stamp = ros::Time::now();
+    debug_trajectory_out.header.frame_id = "world";
+
+    for (int i = 0; i < m_horizon_len; i++) {
+
+      geometry_msgs::Pose newPose;
+
+      newPose.position.x = m_predicted_trajectory(i * m_trans_state_count);
+      newPose.position.y = m_predicted_trajectory(i * m_trans_state_count + 4);
+      newPose.position.z = m_predicted_trajectory(i * m_trans_state_count + 8);
+
+      newPose.orientation = ros_convert::calculate_quaternion(
+        m_predicted_heading_trajectory(i * m_trans_state_count));
+
+      debug_trajectory_out.poses.push_back(newPose);
+    }
+
+    m_mpc_predicted_traj_pub.publish(debug_trajectory_out);
   }
 
   void iterate_model()
@@ -403,6 +455,7 @@ private:
 
         // clang-format on
       } else {
+        ROS_WARN_STREAM_THROTTLE(1.0, "MPCTracker::iterate_model - weird dt: " << dt);
 
         m_A = m_A_orig;
         m_B = m_B_orig;
@@ -476,13 +529,13 @@ private:
       if (i == 0) {
         max_sample_x = max_speed_x * m_dt1;
         max_sample_y = max_speed_y * m_dt1;
-        difference_x = m_desired_traj_x(i, 0) - m_mpc_state(0, 0);
-        difference_y = m_desired_traj_y(i, 0) - m_mpc_state(4, 0);
+        difference_x = des_x_trajectory(i, 0) - m_mpc_state(0, 0);
+        difference_y = des_y_trajectory(i, 0) - m_mpc_state(4, 0);
       } else {
         max_sample_x = max_speed_x * m_dt2;
         max_sample_y = max_speed_y * m_dt2;
-        difference_x = m_desired_traj_x(i, 0) - filtered_x_trajectory(i - 1, 0);
-        difference_y = m_desired_traj_y(i, 0) - filtered_y_trajectory(i - 1, 0);
+        difference_x = des_x_trajectory(i, 0) - filtered_x_trajectory(i - 1, 0);
+        difference_y = des_y_trajectory(i, 0) - filtered_y_trajectory(i - 1, 0);
       }
 
       double direction_angle = atan2(difference_y, difference_x);
@@ -527,7 +580,7 @@ private:
 
       if (i == 0) {
 
-        difference_z = m_desired_traj_z(i, 0) - current_z;
+        difference_z = des_z_trajectory(i, 0) - current_z;
 
         if (difference_z > 0) {
           max_sample_z = max_ascending_speed * m_dt1;
@@ -537,7 +590,7 @@ private:
 
       } else {
 
-        difference_z = m_desired_traj_z(i, 0) - filtered_trajectory(i - 1, 0);
+        difference_z = des_z_trajectory(i, 0) - filtered_trajectory(i - 1, 0);
 
         if (difference_z > 0) {
           max_sample_z = max_ascending_speed * m_dt2;
@@ -562,25 +615,26 @@ private:
 
   void odom_callback(const nav_msgs::OdometryConstPtr &msg)
   {
-    if (!m_is_initialized) { set_virtual_uav_state(*msg); }
+    if (!m_is_initialized || m_hover) { set_virtual_uav_state(*msg); }
     m_curr_odom = *msg;
   }
 
   void pose_callback(const geometry_msgs::PoseStampedConstPtr &msg)
   {
-    trajectory_msgs::MultiDOFJointTrajectory traj;
-    traj.points.push_back(ros_convert::to_trajectory_point(msg->pose.position.x,
+    set_single_ref_point(msg->pose.position.x,
       msg->pose.position.y,
       msg->pose.position.z,
-      msg->pose.orientation.x,
-      msg->pose.orientation.y,
-      msg->pose.orientation.z,
-      msg->pose.orientation.w));
-    load_trajectory(traj);
+      ros_convert::calculateYaw(msg->pose.orientation));
+    m_hover = false;
   }
 
   void load_trajectory(const trajectory_msgs::MultiDOFJointTrajectory &traj_msg)
   {
+    if (!m_is_initialized) {
+      ROS_WARN("MPCTracker::load_trajectory - not initialized");
+      return;
+    }
+
     // TODO: trajectory_msgs::MultiDOFJointTrajectory does not have delta
     double trajectory_dt = 0.2;
     int trajectory_size = traj_msg.points.size();
@@ -625,6 +679,26 @@ private:
     m_tracking_timer.setPeriod(ros::Duration(trajectory_dt));
     m_tracking_timer.start();
 
+
+    geometry_msgs::PoseArray debug_trajectory_out;
+    debug_trajectory_out.header.stamp = ros::Time::now();
+    debug_trajectory_out.header.frame_id = "world";
+
+    for (int i = 0; i < trajectory_size; i++) {
+
+      geometry_msgs::Pose new_pose;
+
+      new_pose.position.x = m_desired_traj_whole_x(i);
+      new_pose.position.y = m_desired_traj_whole_y(i);
+      new_pose.position.z = m_desired_traj_whole_z(i);
+
+      new_pose.orientation =
+        ros_convert::calculate_quaternion(m_desired_traj_whole_heading(i));
+
+      debug_trajectory_out.poses.push_back(new_pose);
+    }
+    m_processed_trajectory_pub.publish(debug_trajectory_out);
+
     ROS_INFO("MPCTracker::load_trajectory - start trajectory tracking");
   }
 
@@ -651,7 +725,18 @@ private:
     m_mpc_heading_state(2, 0) = 0;
     m_mpc_heading_state(3, 0) = 0;
 
+    set_single_ref_point(
+      m_mpc_state(0, 0), m_mpc_state(4, 0), m_mpc_state(8, 0), m_mpc_heading_state(0, 0));
+
     m_is_initialized = true;
+  }
+
+  void set_single_ref_point(double x, double y, double z, double heading)
+  {
+    m_desired_traj_x.fill(x);
+    m_desired_traj_y.fill(y);
+    m_desired_traj_z.fill(z);
+    m_desired_traj_heading.fill(heading);
   }
 
   void initialize_parameters()
@@ -708,6 +793,7 @@ private:
   bool m_is_initialized;
   bool m_is_trajectory_tracking;
   bool m_is_active = true;
+  bool m_hover = true;
 
   /* Solver parameters */
   int m_horizon_len;
@@ -778,6 +864,9 @@ private:
 
   /** Publishers **/
   ros::Publisher m_traj_point_pub;
+  ros::Publisher m_mpc_desired_traj_pub;
+  ros::Publisher m_mpc_predicted_traj_pub;
+  ros::Publisher m_processed_trajectory_pub;
 };
 
 
