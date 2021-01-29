@@ -5,31 +5,14 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 #include <geometry_msgs/PoseArray.h>
+#include <mavros_msgs/AttitudeTarget.h>
 
 #include <uav_ros_tracker/cvx_wrapper.h>
 #include <uav_ros_lib/param_util.hpp>
+#include <uav_ros_lib/reconfigure_handler.hpp>
 #include <uav_ros_lib/ros_convert.hpp>
 #include <uav_ros_lib/nonlinear_filters.hpp>
-
-#define MAX_SPEED_Z 2
-#define MAX_ACC_Z 0.2
-#define MAX_JERK_Z 0.01
-#define MAX_SNAP_Z 0.001
-
-#define MAX_SPEED_X 5
-#define MAX_ACC_X 0.25
-#define MAX_JERK_X 0.01
-#define MAX_SNAP_X 0.001
-
-#define MAX_SPEED_Y 5
-#define MAX_ACC_Y 0.25
-#define MAX_JERK_Y 0.01
-#define MAX_SNAP_Y 0.001
-
-#define MAX_SPEED_HEADING 0.5
-#define MAX_ACC_HEADING 0.01
-#define MAX_JERK_HEADING 0.001
-#define MAX_SNAP_HEADING 0.0001
+#include <uav_ros_tracker/MPCTrackerParametersConfig.h>
 
 /**
  * @brief UAV MPC Tracker implementation as found at
@@ -88,6 +71,8 @@ public:
       m_nh.advertise<geometry_msgs::PoseArray>("debug/mpc_predicted_trajectory", 1);
     m_processed_trajectory_pub =
       m_nh.advertise<geometry_msgs::PoseArray>("debug/processed_trajectory", 1);
+    m_attitude_target_debug_pub =
+      m_nh.advertise<mavros_msgs::AttitudeTarget>("debug/mpc_attitude_target", 1);
 
     // Initialize timers
     m_mpc_iteration_timer =
@@ -208,11 +193,14 @@ private:
     double iters_y = 0;
     double iters_heading = 0;
 
+    // Get newest tracker parasm
+    auto constraints = m_reconfigure_handler->getData();
+
     /* Do the z-axis MPC */
 
     // Calculated filtered z-axis reference
     Eigen::MatrixXd des_z_filtered =
-      filterReferenceZ(m_desired_traj_z, -MAX_SPEED_Z, MAX_SPEED_Z);
+      filterReferenceZ(m_desired_traj_z, -constraints.z_velocity, constraints.z_velocity);
 
     // Set the z-axis initial state
     Eigen::MatrixXd initial_z = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
@@ -225,14 +213,14 @@ private:
     m_solver_z->setVelQ(0);
     m_solver_z->setInitialState(initial_z);
     m_solver_z->loadReference(des_z_filtered);
-    m_solver_z->setLimits(MAX_SPEED_Z,
-      -MAX_SPEED_Z,
-      MAX_ACC_Z,
-      -MAX_ACC_Z,
-      MAX_JERK_Z,
-      -MAX_JERK_Z,
-      MAX_SNAP_Z,
-      -MAX_SNAP_Z);
+    m_solver_z->setLimits(constraints.z_velocity,
+      -constraints.z_velocity,
+      constraints.z_acceleration,
+      -constraints.z_acceleration,
+      constraints.z_jerk,
+      -constraints.z_jerk,
+      constraints.z_snap,
+      -constraints.z_snap);
 
     // Run z solver
     iters_z += m_solver_z->solveCvx();
@@ -242,8 +230,10 @@ private:
     /* Do the x-axis MPC */
 
     // Calculate filterd xy-axis reference
-    auto [des_x_filtered, des_y_filtered] =
-      filterReferenceXY(m_desired_traj_x, m_desired_traj_y, MAX_SPEED_X, MAX_SPEED_Y);
+    auto [des_x_filtered, des_y_filtered] = filterReferenceXY(m_desired_traj_x,
+      m_desired_traj_y,
+      constraints.xy_velocity,
+      constraints.xy_velocity);
 
     // Set x-axis initial state
     Eigen::MatrixXd initial_x = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
@@ -256,14 +246,14 @@ private:
     m_solver_x->setVelQ(0);
     m_solver_x->setInitialState(initial_x);
     m_solver_x->loadReference(des_x_filtered);
-    m_solver_x->setLimits(MAX_SPEED_X,
-      -MAX_SPEED_X,
-      MAX_ACC_X,
-      -MAX_ACC_X,
-      MAX_JERK_X,
-      -MAX_JERK_X,
-      MAX_SNAP_X,
-      -MAX_SNAP_X);
+    m_solver_x->setLimits(constraints.xy_velocity,
+      -constraints.xy_velocity,
+      constraints.xy_acceleration,
+      -constraints.xy_acceleration,
+      constraints.xy_jerk,
+      -constraints.xy_jerk,
+      constraints.xy_snap,
+      -constraints.xy_snap);
 
     // Run x solver
     iters_x += m_solver_x->solveCvx();
@@ -283,14 +273,14 @@ private:
     m_solver_y->setVelQ(0);
     m_solver_y->setInitialState(initial_y);
     m_solver_y->loadReference(des_y_filtered);
-    m_solver_y->setLimits(MAX_SPEED_Y,
-      -MAX_SPEED_Y,
-      MAX_ACC_Y,
-      -MAX_ACC_Y,
-      MAX_JERK_Y,
-      -MAX_JERK_Y,
-      MAX_SNAP_Y,
-      -MAX_SNAP_Y);
+    m_solver_y->setLimits(constraints.xy_velocity,
+      -constraints.xy_velocity,
+      constraints.xy_acceleration,
+      -constraints.xy_acceleration,
+      constraints.xy_jerk,
+      -constraints.xy_jerk,
+      constraints.xy_snap,
+      -constraints.xy_snap);
 
     // Run x solver
     iters_y += m_solver_y->solveCvx();
@@ -311,51 +301,58 @@ private:
     m_solver_heading->setVelQ(0);
     m_solver_heading->setInitialState(m_mpc_heading_state);
     m_solver_heading->loadReference(m_desired_traj_heading);
-    m_solver_heading->setLimits(MAX_SPEED_HEADING,
-      -MAX_SPEED_HEADING,
-      MAX_ACC_HEADING,
-      -MAX_ACC_HEADING,
-      MAX_JERK_HEADING,
-      -MAX_JERK_HEADING,
-      MAX_SNAP_HEADING,
-      -MAX_SNAP_HEADING);
+    m_solver_heading->setLimits(constraints.heading_velocity,
+      -constraints.heading_velocity,
+      constraints.heading_acceleration,
+      -constraints.heading_acceleration,
+      constraints.heading_jerk,
+      -constraints.heading_jerk,
+      constraints.heading_snap,
+      -constraints.heading_snap);
 
     // Run heading solver
     iters_heading += m_solver_heading->solveCvx();
     m_solver_heading->getStates(m_predicted_heading_trajectory);
     m_mpc_u_heading = m_solver_heading->getFirstControlInput();
 
+    if (m_mpc_state(0) > constraints.xy_snap * 1.01) {
+      ROS_WARN_STREAM_THROTTLE(
+        1.0, "MPCTracker::calculate_mpc  - saturating snap X: " << m_mpc_state(0));
+      m_mpc_state(0) = constraints.xy_snap;
+    }
+    if (m_mpc_state(0) < -constraints.xy_snap * 1.01) {
+      ROS_WARN_STREAM_THROTTLE(
+        1.0, "MPCTracker::calculate_mpc  - saturating snap X: " << m_mpc_state(0));
+      m_mpc_state(0) = -constraints.xy_snap;
+    }
+    if (m_mpc_state(1) > constraints.xy_snap * 1.01) {
+      ROS_WARN_STREAM_THROTTLE(
+        1.0, "MPCTracker::calculate_mpc  - saturating snap Y: " << m_mpc_state(1));
+      m_mpc_state(1) = constraints.xy_snap;
+    }
+    if (m_mpc_state(1) < -constraints.xy_snap * 1.01) {
+      ROS_WARN_STREAM_THROTTLE(
+        1.0, "MPCTracker::calculate_mpc  - saturating snap Y: " << m_mpc_state(1));
+      m_mpc_state(1) = -constraints.xy_snap;
+    }
+    if (m_mpc_state(2) > constraints.z_snap * 1.01) {
+      ROS_WARN_STREAM_THROTTLE(
+        1.0, "MPCTracker::calculate_mpc  - saturating snap Z: " << m_mpc_state(2));
+      m_mpc_state(2) = constraints.z_snap;
+    }
+    if (m_mpc_state(2) < -constraints.z_snap * 1.01) {
+      ROS_WARN_STREAM_THROTTLE(
+        1.0, "MPCTracker::calculate_mpc  - saturating snap Z: " << m_mpc_state(2));
+      m_mpc_state(2) = -constraints.z_snap;
+    }
 
-    if (m_mpc_state(0) > MAX_SNAP_X * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap X: " << m_mpc_state(0));
-      m_mpc_state(0) = MAX_SNAP_X;
-    }
-    if (m_mpc_state(0) < -MAX_SNAP_X * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap X: " << m_mpc_state(0));
-      m_mpc_state(0) = -MAX_SNAP_X;
-    }
-    if (m_mpc_state(1) > MAX_SNAP_Y * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap Y: " << m_mpc_state(1));
-      m_mpc_state(1) = MAX_SNAP_Y;
-    }
-    if (m_mpc_state(1) < -MAX_SNAP_Y * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap Y: " << m_mpc_state(1));
-      m_mpc_state(1) = -MAX_SNAP_Y;
-    }
-    if (m_mpc_state(2) > MAX_SNAP_Z * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap Z: " << m_mpc_state(2));
-      m_mpc_state(2) = MAX_SNAP_Z;
-    }
-    if (m_mpc_state(2) < -MAX_SNAP_Z * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap Z: " << m_mpc_state(2));
-      m_mpc_state(2) = -MAX_SNAP_Z;
-    }
+    mavros_msgs::AttitudeTarget target;
+    target.header.stamp = ros::Time::now();
+    target.body_rate.x = m_mpc_u(0);
+    target.body_rate.y = m_mpc_u(1);
+    target.body_rate.z = m_mpc_u_heading;
+    target.thrust = m_mpc_u(2);
+    m_attitude_target_debug_pub.publish(target);
 
     // Publish desired trajectory
     geometry_msgs::PoseArray debug_trajectory_out;
@@ -374,6 +371,9 @@ private:
 
       debug_trajectory_out.poses.push_back(new_pose);
     }
+    ROS_INFO_STREAM_THROTTLE(0.5,
+      "MPCTracker::calculate_mpc - " << debug_trajectory_out.poses.size()
+                                     << " desired poses.");
     m_mpc_desired_traj_pub.publish(debug_trajectory_out);
     publish_predicted_trajectory();
   }
@@ -741,7 +741,7 @@ private:
 
   void initialize_parameters()
   {
-    ros::NodeHandle nh_private("~");
+    ros::NodeHandle nh_private;
     param_util::getParamOrThrow(nh_private, "rate", m_tracker_rate);
     m_dt1 = 1.0 / m_tracker_rate;
 
@@ -779,6 +779,39 @@ private:
     param_util::getParamOrThrow(nh_private, "solver/z/Q", m_Q_z);
     param_util::getParamOrThrow(nh_private, "solver/heading/Q", m_Q_heading);
     param_util::getParamOrThrow(nh_private, "solver/dt2", m_dt2);
+
+    // Load solver constraints
+    uav_ros_tracker::MPCTrackerParametersConfig default_config;
+
+    param_util::getParamOrThrow(
+      nh_private, "constraints/xy/velocity", default_config.xy_velocity);
+    param_util::getParamOrThrow(
+      nh_private, "constraints/xy/acceleration", default_config.xy_acceleration);
+    param_util::getParamOrThrow(
+      nh_private, "constraints/xy/jerk", default_config.xy_jerk);
+    param_util::getParamOrThrow(
+      nh_private, "constraints/xy/snap", default_config.xy_snap);
+
+    param_util::getParamOrThrow(
+      nh_private, "constraints/z/velocity", default_config.z_velocity);
+    param_util::getParamOrThrow(
+      nh_private, "constraints/z/acceleration", default_config.z_acceleration);
+    param_util::getParamOrThrow(nh_private, "constraints/z/jerk", default_config.z_jerk);
+    param_util::getParamOrThrow(nh_private, "constraints/z/snap", default_config.z_snap);
+
+    param_util::getParamOrThrow(
+      nh_private, "constraints/heading/velocity", default_config.heading_velocity);
+    param_util::getParamOrThrow(nh_private,
+      "constraints/heading/acceleration",
+      default_config.heading_acceleration);
+    param_util::getParamOrThrow(
+      nh_private, "constraints/heading/jerk", default_config.heading_jerk);
+    param_util::getParamOrThrow(
+      nh_private, "constraints/heading/snap", default_config.heading_snap);
+
+    m_reconfigure_handler = std::make_unique<
+      ros_util::ReconfigureHandler<uav_ros_tracker::MPCTrackerParametersConfig>>(
+      default_config, "mpc_tracker");
   }
 
   std::unique_ptr<uav_ros_trackers::cvx_wrapper::CvxWrapper> m_solver_x;
@@ -867,6 +900,12 @@ private:
   ros::Publisher m_mpc_desired_traj_pub;
   ros::Publisher m_mpc_predicted_traj_pub;
   ros::Publisher m_processed_trajectory_pub;
+  ros::Publisher m_attitude_target_debug_pub;
+
+  /* Dynamic Reconfigre */
+  std::unique_ptr<
+    ros_util::ReconfigureHandler<uav_ros_tracker::MPCTrackerParametersConfig>>
+    m_reconfigure_handler;
 };
 
 

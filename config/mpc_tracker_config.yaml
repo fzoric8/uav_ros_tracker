@@ -70,3 +70,23 @@ solver:
     verbose: true
     max_iterations: 25 # default: 25
     Q: [5000, 0, 0, 0]
+
+constraints:
+
+  xy:
+    velocity: 5
+    acceleration: 0.5
+    jerk: 1
+    snap: 1
+
+  z:
+    velocity: 2
+    acceleration: 0.2
+    jerk: 1
+    snap: 1
+
+  heading:
+    velocity: 0.5
+    acceleration: 0.01
+    jerk: 1
+    snap: 1
