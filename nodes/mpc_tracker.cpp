@@ -214,13 +214,13 @@ private:
     m_solver_z->setInitialState(initial_z);
     m_solver_z->loadReference(des_z_filtered);
     m_solver_z->setLimits(constraints.z_velocity,
-      -constraints.z_velocity,
+      constraints.z_velocity,
       constraints.z_acceleration,
-      -constraints.z_acceleration,
+      constraints.z_acceleration,
       constraints.z_jerk,
-      -constraints.z_jerk,
+      constraints.z_jerk,
       constraints.z_snap,
-      -constraints.z_snap);
+      constraints.z_snap);
 
     // Run z solver
     iters_z += m_solver_z->solveCvx();
@@ -247,13 +247,13 @@ private:
     m_solver_x->setInitialState(initial_x);
     m_solver_x->loadReference(des_x_filtered);
     m_solver_x->setLimits(constraints.xy_velocity,
-      -constraints.xy_velocity,
+      constraints.xy_velocity,
       constraints.xy_acceleration,
-      -constraints.xy_acceleration,
+      constraints.xy_acceleration,
       constraints.xy_jerk,
-      -constraints.xy_jerk,
+      constraints.xy_jerk,
       constraints.xy_snap,
-      -constraints.xy_snap);
+      constraints.xy_snap);
 
     // Run x solver
     iters_x += m_solver_x->solveCvx();
@@ -274,13 +274,13 @@ private:
     m_solver_y->setInitialState(initial_y);
     m_solver_y->loadReference(des_y_filtered);
     m_solver_y->setLimits(constraints.xy_velocity,
-      -constraints.xy_velocity,
+      constraints.xy_velocity,
       constraints.xy_acceleration,
-      -constraints.xy_acceleration,
+      constraints.xy_acceleration,
       constraints.xy_jerk,
-      -constraints.xy_jerk,
+      constraints.xy_jerk,
       constraints.xy_snap,
-      -constraints.xy_snap);
+      constraints.xy_snap);
 
     // Run x solver
     iters_y += m_solver_y->solveCvx();
@@ -302,13 +302,13 @@ private:
     m_solver_heading->setInitialState(m_mpc_heading_state);
     m_solver_heading->loadReference(m_desired_traj_heading);
     m_solver_heading->setLimits(constraints.heading_velocity,
-      -constraints.heading_velocity,
+      constraints.heading_velocity,
       constraints.heading_acceleration,
-      -constraints.heading_acceleration,
+      constraints.heading_acceleration,
       constraints.heading_jerk,
-      -constraints.heading_jerk,
+      constraints.heading_jerk,
       constraints.heading_snap,
-      -constraints.heading_snap);
+      constraints.heading_snap);
 
     // Run heading solver
     iters_heading += m_solver_heading->solveCvx();
