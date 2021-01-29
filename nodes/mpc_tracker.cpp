@@ -200,7 +200,7 @@ private:
 
     // Calculated filtered z-axis reference
     Eigen::MatrixXd des_z_filtered =
-      filterReferenceZ(m_desired_traj_z, -constraints.z_velocity, constraints.z_velocity);
+      filterReferenceZ(m_desired_traj_z, constraints.z_velocity, constraints.z_velocity);
 
     // Set the z-axis initial state
     Eigen::MatrixXd initial_z = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
@@ -315,36 +315,15 @@ private:
     m_solver_heading->getStates(m_predicted_heading_trajectory);
     m_mpc_u_heading = m_solver_heading->getFirstControlInput();
 
-    if (m_mpc_state(0) > constraints.xy_snap * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap X: " << m_mpc_state(0));
-      m_mpc_state(0) = constraints.xy_snap;
-    }
-    if (m_mpc_state(0) < -constraints.xy_snap * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap X: " << m_mpc_state(0));
-      m_mpc_state(0) = -constraints.xy_snap;
-    }
-    if (m_mpc_state(1) > constraints.xy_snap * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap Y: " << m_mpc_state(1));
-      m_mpc_state(1) = constraints.xy_snap;
-    }
-    if (m_mpc_state(1) < -constraints.xy_snap * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap Y: " << m_mpc_state(1));
-      m_mpc_state(1) = -constraints.xy_snap;
-    }
-    if (m_mpc_state(2) > constraints.z_snap * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap Z: " << m_mpc_state(2));
-      m_mpc_state(2) = constraints.z_snap;
-    }
-    if (m_mpc_state(2) < -constraints.z_snap * 1.01) {
-      ROS_WARN_STREAM_THROTTLE(
-        1.0, "MPCTracker::calculate_mpc  - saturating snap Z: " << m_mpc_state(2));
-      m_mpc_state(2) = -constraints.z_snap;
-    }
+    // Saturate heading
+    m_mpc_u(0) = nonlinear_filters::saturation(
+      m_mpc_u(0), -1.01 * constraints.xy_snap, 1.01 * constraints.xy_snap);
+    m_mpc_u(1) = nonlinear_filters::saturation(
+      m_mpc_u(1), -1.01 * constraints.xy_snap, 1.01 * constraints.xy_snap);
+    m_mpc_u(2) = nonlinear_filters::saturation(
+      m_mpc_u(2), -1.01 * constraints.z_snap, 1.01 * constraints.z_snap);
+    m_mpc_u_heading = nonlinear_filters::saturation(
+      m_mpc_u_heading, -1.01 * constraints.heading_snap, 1.01 * constraints.heading_snap);
 
     mavros_msgs::AttitudeTarget target;
     target.header.stamp = ros::Time::now();

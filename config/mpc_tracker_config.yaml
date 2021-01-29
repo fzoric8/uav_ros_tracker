@@ -82,8 +82,8 @@ constraints:
   z:
     velocity: 2
     acceleration: 0.2
-    jerk: 1
-    snap: 1
+    jerk: 20.0
+    snap: 20.0
 
   heading:
     velocity: 0.5
