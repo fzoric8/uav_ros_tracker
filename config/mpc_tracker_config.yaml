@@ -74,19 +74,19 @@ solver:
 constraints:
 
   xy:
-    velocity: 5
-    acceleration: 0.5
-    jerk: 1
-    snap: 1
-
-  z:
-    velocity: 2
-    acceleration: 0.2
+    velocity: 2.0
+    acceleration: 1.0
     jerk: 20.0
     snap: 20.0
 
+  z:
+    velocity: 1.0
+    acceleration: 1.0
+    jerk: 2.0
+    snap: 2.0
+
   heading:
     velocity: 0.5
-    acceleration: 0.01
-    jerk: 1
-    snap: 1
+    acceleration: 0.5
+    jerk: 10.0
+    snap: 10.0

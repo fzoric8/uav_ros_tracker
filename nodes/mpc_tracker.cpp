@@ -73,6 +73,8 @@ public:
       m_nh.advertise<geometry_msgs::PoseArray>("debug/processed_trajectory", 1);
     m_attitude_target_debug_pub =
       m_nh.advertise<mavros_msgs::AttitudeTarget>("debug/mpc_attitude_target", 1);
+    m_current_pose_debug_pub =
+      m_nh.advertise<geometry_msgs::PoseStamped>("debug/virtual_uav_pose", 1);
 
     // Initialize timers
     m_mpc_iteration_timer =
@@ -109,7 +111,7 @@ private:
       return;
     }
 
-    ROS_INFO_THROTTLE(1.0, "MPCTracker::mpc_iterations");
+    ROS_INFO_THROTTLE(10.0, "MPCTracker::mpc_iterations");
 
     if (m_is_trajectory_tracking) { interpolate_trajectory(); }
 
@@ -136,6 +138,15 @@ private:
         m_curr_odom.pose.pose.orientation.z,
         m_curr_odom.pose.pose.orientation.w);
 
+    // Concstruct the pose command
+    geometry_msgs::PoseStamped virtual_uav_pose;
+    virtual_uav_pose.header.frame_id = "world";
+    virtual_uav_pose.header.stamp = ros::Time::now();
+    virtual_uav_pose.pose.position.x = m_curr_odom.pose.pose.position.x;
+    virtual_uav_pose.pose.position.y = m_curr_odom.pose.pose.position.y;
+    virtual_uav_pose.pose.position.z = m_curr_odom.pose.pose.position.z;
+    virtual_uav_pose.pose.orientation = m_curr_odom.pose.pose.orientation;
+
     if (is_state_finite) {
       // TODO: Make a msg to accomodate jerk commands
       trajectory_point_ref.transforms.front().translation.x = m_mpc_state(0, 0);
@@ -149,6 +160,11 @@ private:
       trajectory_point_ref.transforms.front().translation.z = m_mpc_state(8, 0);
       trajectory_point_ref.velocities.front().linear.z = m_mpc_state(9, 0);
       trajectory_point_ref.accelerations.front().linear.z = m_mpc_state(10, 0);
+
+      virtual_uav_pose.pose.position.x = m_mpc_state(0, 0);
+      virtual_uav_pose.pose.position.y = m_mpc_state(4, 0);
+      virtual_uav_pose.pose.position.z = m_mpc_state(8, 0);
+
     } else {
       ROS_ERROR_THROTTLE(
         1.0, "MPCTracker::publish_trajectory_point - MPC state is not finite.");
@@ -175,6 +191,9 @@ private:
         ros_convert::calculate_quaternion(m_mpc_heading_state(0, 0));
       trajectory_point_ref.velocities.front().angular.z = m_mpc_heading_state(1, 0);
       trajectory_point_ref.accelerations.front().angular.z = m_mpc_heading_state(2, 0);
+
+      virtual_uav_pose.pose.orientation =
+        trajectory_point_ref.transforms.front().rotation;
     } else {
       trajectory_point_ref.velocities.front().angular.z = 0;
       trajectory_point_ref.accelerations.front().angular.z = 0;
@@ -184,6 +203,7 @@ private:
     // TODO: Make a trajectory point message with a timestamp in the header...
 
     m_traj_point_pub.publish(trajectory_point_ref);
+    m_current_pose_debug_pub.publish(virtual_uav_pose);
   }
 
   void calculate_mpc()
@@ -350,9 +370,6 @@ private:
 
       debug_trajectory_out.poses.push_back(new_pose);
     }
-    ROS_INFO_STREAM_THROTTLE(0.5,
-      "MPCTracker::calculate_mpc - " << debug_trajectory_out.poses.size()
-                                     << " desired poses.");
     m_mpc_desired_traj_pub.publish(debug_trajectory_out);
     publish_predicted_trajectory();
   }
@@ -880,6 +897,7 @@ private:
   ros::Publisher m_mpc_predicted_traj_pub;
   ros::Publisher m_processed_trajectory_pub;
   ros::Publisher m_attitude_target_debug_pub;
+  ros::Publisher m_current_pose_debug_pub;
 
   /* Dynamic Reconfigre */
   std::unique_ptr<
