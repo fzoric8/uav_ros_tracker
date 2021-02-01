@@ -40,11 +40,7 @@ jobs:
       # Runs a single command using the runners shell
       - name: Install
         run: ./.ci/ci_before_install.sh
-        env:
-          ACCEPT_EULA: Y
 
       # Runs a set of commands using the runners shell
       - name: Build
         run: ./.ci/ci_test_build.sh
-        env:
-          ACCEPT_EULA: Y
