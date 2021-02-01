@@ -26,13 +26,13 @@ public:
   {
     initialize_parameters();
 
-    m_solver_x = std::make_unique<uav_ros_trackers::cvx_wrapper::CvxWrapper>(
+    m_solver_x = std::make_unique<uav_ros_tracker::cvx_wrapper::CvxWrapper>(
       false, m_max_iter_xy, m_Q_xy, m_dt1, m_dt2, 0);
-    m_solver_y = std::make_unique<uav_ros_trackers::cvx_wrapper::CvxWrapper>(
+    m_solver_y = std::make_unique<uav_ros_tracker::cvx_wrapper::CvxWrapper>(
       false, m_max_iter_xy, m_Q_xy, m_dt1, m_dt2, 1);
-    m_solver_z = std::make_unique<uav_ros_trackers::cvx_wrapper::CvxWrapper>(
+    m_solver_z = std::make_unique<uav_ros_tracker::cvx_wrapper::CvxWrapper>(
       false, m_max_iter_z, m_Q_z, m_dt1, m_dt2, 2);
-    m_solver_heading = std::make_unique<uav_ros_trackers::cvx_wrapper::CvxWrapper>(
+    m_solver_heading = std::make_unique<uav_ros_tracker::cvx_wrapper::CvxWrapper>(
       false, m_max_iter_heading, m_Q_heading, m_dt1, m_dt2, 0);
 
     // Initialize mpc states
@@ -810,10 +810,10 @@ private:
       default_config, "mpc_tracker");
   }
 
-  std::unique_ptr<uav_ros_trackers::cvx_wrapper::CvxWrapper> m_solver_x;
-  std::unique_ptr<uav_ros_trackers::cvx_wrapper::CvxWrapper> m_solver_y;
-  std::unique_ptr<uav_ros_trackers::cvx_wrapper::CvxWrapper> m_solver_z;
-  std::unique_ptr<uav_ros_trackers::cvx_wrapper::CvxWrapper> m_solver_heading;
+  std::unique_ptr<uav_ros_tracker::cvx_wrapper::CvxWrapper> m_solver_x;
+  std::unique_ptr<uav_ros_tracker::cvx_wrapper::CvxWrapper> m_solver_y;
+  std::unique_ptr<uav_ros_tracker::cvx_wrapper::CvxWrapper> m_solver_z;
+  std::unique_ptr<uav_ros_tracker::cvx_wrapper::CvxWrapper> m_solver_heading;
 
   ros::NodeHandle m_nh;
   double m_tracker_rate;

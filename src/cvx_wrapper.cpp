@@ -5,7 +5,7 @@
 
 using namespace Eigen;
 
-namespace uav_ros_trackers {
+namespace uav_ros_tracker {
 
 namespace cvx_wrapper {
 
@@ -234,4 +234,4 @@ namespace cvx_wrapper {
 
 }// namespace cvx_wrapper
 
-}// namespace uav_ros_trackers
+}// namespace uav_ros_tracker
