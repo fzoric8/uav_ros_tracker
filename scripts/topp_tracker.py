@@ -55,8 +55,8 @@ class ToppTracker:
 
         self.point_index = 0
         self.trajectory = MultiDOFJointTrajectory()
-        self.traj_sub = rospy.Subscriber("topp/input_trajectory", MultiDOFJointTrajectory, self.trajectory_cb)
-        self.pose_sub = rospy.Subscriber("topp/input_pose", PoseStamped, self.pose_cb)
+        self.traj_sub = rospy.Subscriber("tracker/input_trajectory", MultiDOFJointTrajectory, self.trajectory_cb)
+        self.pose_sub = rospy.Subscriber("tracker/input_pose", PoseStamped, self.pose_cb)
 
         self.carrot_status = String()
         self.carrot_status.data = "HOLD"
@@ -67,12 +67,12 @@ class ToppTracker:
         self.carrot_trajectory_sub = rospy.Subscriber("carrot/trajectory", MultiDOFJointTrajectoryPoint, self.carrot_trajectory_cb)
         
         self.point_pub = rospy.Publisher("output/point", MultiDOFJointTrajectoryPoint, queue_size=1)
-        self.activity_pub = rospy.Publisher("topp/status", String, queue_size=1)
-        self.path_pub = rospy.Publisher("topp/path", Path, queue_size=1)
+        self.activity_pub = rospy.Publisher("tracker/status", String, queue_size=1)
+        self.path_pub = rospy.Publisher("tracker/path", Path, queue_size=1)
 
         self.enable_trajectory = False
-        self.enable_service = rospy.Service("topp/enable", Empty, self.enable_service_cb)
-        self.topp_reset = rospy.Service("topp/reset", Empty, self.reset_service_cb)
+        self.enable_service = rospy.Service("tracker/enable", Empty, self.enable_service_cb)
+        self.topp_reset = rospy.Service("tracker/reset", Empty, self.reset_service_cb)
         
     def reset_service_cb(self, req):
         print("ToppTracker - RESET request recieved")

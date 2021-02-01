@@ -1,6 +1,6 @@
 <launch>
     <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
-    <arg name="input_trajectory" default="topp/input/trajectory"/>
+    <arg name="input_trajectory" default="tracker/input/trajectory"/>
     <arg name="output_point" default="position_hold/trajectory"/>
     <arg name="odom" default="mavros/global_position/local"/>
     <arg name="tracker_config" default="$(find uav_ros_tracker)/config/topp_config_default.yaml" />
