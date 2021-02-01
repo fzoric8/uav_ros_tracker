@@ -28,10 +28,11 @@ class MPCTracker
 
 public:
   /**
-   * @brief Construct a new MPCTracker object. Initialize the MPC tracker;
-   *
+   * @brief @brief Construct a new MPCTracker object. Initialize the MPC tracker;
+   * 
+   * @param nh 
    */
-  MPCTracker();
+  explicit MPCTracker(ros::NodeHandle& nh);
 
 private:
   void initialize_parameters();

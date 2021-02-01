@@ -8,7 +8,7 @@
 #include <uav_ros_lib/ros_convert.hpp>
 #include <uav_ros_lib/nonlinear_filters.hpp>
 
-uav_ros_tracker::MPCTracker::MPCTracker()
+uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
 {
   initialize_parameters();
 
