@@ -18,7 +18,7 @@ add_library(mpc_cvxgen src/cvxgen/ldl.c src/cvxgen/matrix_support.c src/cvxgen/s
 add_library(mpc_wrapper src/cvx_wrapper.cpp)
 target_link_libraries(mpc_wrapper mpc_cvxgen ${catkin_LIBRARIES})
 
-add_executable(mpc_tracker nodes/mpc_tracker.cpp)
+add_executable(mpc_tracker nodes/mpc_tracker.cpp nodes/mpc_tracker_node.cpp)
 target_link_libraries(mpc_tracker mpc_wrapper)
 add_dependencies(mpc_tracker ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
 
