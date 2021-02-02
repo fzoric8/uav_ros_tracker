@@ -5,6 +5,7 @@
 #include <nav_msgs/Odometry.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <std_msgs/String.h>
 
 #include <uav_ros_tracker/cvx_wrapper.h>
 #include <uav_ros_lib/reconfigure_handler.hpp>
@@ -28,7 +29,7 @@ class MPCTracker
 
 public:
   /**
-   * @brief @brief Construct a new MPCTracker object. Initialize the MPC tracker;
+   * @brief Construct a new MPCTracker object. Initialize the MPC tracker;
    * 
    * @param nh 
    */
@@ -45,7 +46,8 @@ private:
   void trajectory_callback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr &msg);
   void odom_callback(const nav_msgs::OdometryConstPtr &msg);
   void pose_callback(const geometry_msgs::PoseStampedConstPtr &msg);
-
+  void csv_traj_callback(const std_msgs::StringConstPtr &msg);
+  
   void publish_command_reference();
   void publish_predicted_trajectory();
 
@@ -79,7 +81,7 @@ private:
   bool m_is_initialized;
   bool m_is_trajectory_tracking;
   bool m_is_active = true;
-  bool m_hover = true;
+  bool m_goto_trajectory_start;
 
   /* Solver parameters */
   int m_horizon_len;
@@ -124,6 +126,11 @@ private:
   Eigen::MatrixXd m_desired_traj_z;
   Eigen::MatrixXd m_desired_traj_heading;
 
+  Eigen::MatrixXd m_desired_traj_filtered_x;
+  Eigen::MatrixXd m_desired_traj_filtered_y;
+  Eigen::MatrixXd m_desired_traj_filtered_z;
+  Eigen::MatrixXd m_desired_traj_filtered_heading;
+
   Eigen::VectorXd m_desired_traj_whole_x;
   Eigen::VectorXd m_desired_traj_whole_y;
   Eigen::VectorXd m_desired_traj_whole_z;
@@ -147,14 +154,17 @@ private:
   ros::Subscriber m_odom_sub;
   ros::Subscriber m_pose_sub;
   ros::Subscriber m_traj_sub;
+  ros::Subscriber m_csv_traj_sub;
 
   /** Publishers **/
   ros::Publisher m_traj_point_pub;
   ros::Publisher m_mpc_desired_traj_pub;
+  ros::Publisher m_mpc_desired_filtered_traj_pub;
   ros::Publisher m_mpc_predicted_traj_pub;
   ros::Publisher m_processed_trajectory_pub;
   ros::Publisher m_attitude_target_debug_pub;
   ros::Publisher m_current_pose_debug_pub;
+  ros::Publisher m_curr_traj_point_debug_pub;
 
   /* Dynamic Reconfigre */
   std::unique_ptr<

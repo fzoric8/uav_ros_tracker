@@ -7,6 +7,7 @@
 #include <uav_ros_lib/param_util.hpp>
 #include <uav_ros_lib/ros_convert.hpp>
 #include <uav_ros_lib/nonlinear_filters.hpp>
+#include <uav_ros_lib/trajectory/trajectory_helper.hpp>
 
 uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
 {
@@ -39,19 +40,24 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
     Eigen::MatrixXd::Zero(m_horizon_len * m_trans_state_count, 1);
 
   m_is_trajectory_tracking = false;
+  m_goto_trajectory_start = false;
   m_is_initialized = false;
 
   // Initialize subscribers
   m_odom_sub = m_nh.subscribe("odometry", 1, &MPCTracker::odom_callback, this);
-  m_pose_sub = m_nh.subscribe("pose_input", 1, &MPCTracker::pose_callback, this);
+  m_pose_sub = m_nh.subscribe("tracker/pose_input", 1, &MPCTracker::pose_callback, this);
   m_traj_sub =
-    m_nh.subscribe("trajectory_input", 1, &MPCTracker::trajectory_callback, this);
+    m_nh.subscribe("tracker/trajectory_input", 1, &MPCTracker::trajectory_callback, this);
+  m_csv_traj_sub =
+    m_nh.subscribe("tracker/csv_input", 1, &MPCTracker::csv_traj_callback, this);
 
   // Initialize publishers
   m_traj_point_pub =
     m_nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("position_command", 1);
   m_mpc_desired_traj_pub =
     m_nh.advertise<geometry_msgs::PoseArray>("debug/mpc_desired_trajectory", 1);
+  m_mpc_desired_filtered_traj_pub =
+    m_nh.advertise<geometry_msgs::PoseArray>("debug/mpc_desired_filtered_trajectory", 1);
   m_mpc_predicted_traj_pub =
     m_nh.advertise<geometry_msgs::PoseArray>("debug/mpc_predicted_trajectory", 1);
   m_processed_trajectory_pub =
@@ -60,6 +66,8 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
     m_nh.advertise<mavros_msgs::AttitudeTarget>("debug/mpc_attitude_target", 1);
   m_current_pose_debug_pub =
     m_nh.advertise<geometry_msgs::PoseStamped>("debug/virtual_uav_pose", 1);
+  m_curr_traj_point_debug_pub =
+    m_nh.advertise<geometry_msgs::PoseStamped>("debug/curr_traj_point", 1);
 
   // Initialize timers
   m_mpc_timer_timer =
@@ -70,7 +78,31 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
 
 void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unused */)
 {
-  m_trajectory_idx++;
+  nav_msgs::Odometry curr_virtual_odom;
+  curr_virtual_odom.pose.pose.position.x = m_mpc_state(0, 0);
+  curr_virtual_odom.pose.pose.position.y = m_mpc_state(4, 0);
+  curr_virtual_odom.pose.pose.position.z = m_mpc_state(8, 0);
+
+  trajectory_msgs::MultiDOFJointTrajectoryPoint first_traj_point;
+  first_traj_point.transforms.push_back(geometry_msgs::Transform());
+  first_traj_point.transforms.front().translation.x =
+    m_desired_traj_whole_x(m_trajectory_idx);
+  first_traj_point.transforms.front().translation.y =
+    m_desired_traj_whole_y(m_trajectory_idx);
+  first_traj_point.transforms.front().translation.z =
+    m_desired_traj_whole_z(m_trajectory_idx);
+
+  if (m_goto_trajectory_start
+      && trajectory_helper::is_close_to_reference(
+           first_traj_point, curr_virtual_odom, 0.25)) {
+
+    ROS_INFO("MPCTracker::tracking_timer - first point reached");
+    m_goto_trajectory_start = false;
+    m_is_trajectory_tracking = true;
+  } else if (m_is_trajectory_tracking) {
+    m_trajectory_idx++;
+  }
+
   ROS_INFO_STREAM_THROTTLE(1.0,
     "MPCTracker::tracking_timer - [" << m_trajectory_idx << "/" << m_trajectory_size
                                      << "]");
@@ -80,6 +112,16 @@ void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unus
     m_tracking_timer.stop();
     ROS_INFO("MPCTracker::tracking_timer - trajectory tracking done");
   }
+
+  geometry_msgs::PoseStamped debug_traj_ref;
+  debug_traj_ref.header.frame_id = "world";
+  debug_traj_ref.header.stamp = ros::Time::now();
+  debug_traj_ref.pose.position.x = m_desired_traj_whole_x(m_trajectory_idx);
+  debug_traj_ref.pose.position.y = m_desired_traj_whole_y(m_trajectory_idx);
+  debug_traj_ref.pose.position.z = m_desired_traj_whole_z(m_trajectory_idx);
+  debug_traj_ref.pose.orientation =
+    ros_convert::calculate_quaternion(m_desired_traj_whole_heading(m_trajectory_idx));
+  m_curr_traj_point_debug_pub.publish(debug_traj_ref);
 }
 
 void uav_ros_tracker::MPCTracker::mpc_timer(const ros::TimerEvent & /* unused */)
@@ -334,24 +376,45 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
   m_attitude_target_debug_pub.publish(target);
 
   // Publish desired trajectory
-  geometry_msgs::PoseArray debug_trajectory_out;
-  debug_trajectory_out.header.stamp = ros::Time::now();
-  debug_trajectory_out.header.frame_id = "world";
+  geometry_msgs::PoseArray debug_des_filtered;
+  debug_des_filtered.header.stamp = ros::Time::now();
+  debug_des_filtered.header.frame_id = "world";
+
+  geometry_msgs::PoseArray debug_des;
+  debug_des.header.stamp = ros::Time::now();
+  debug_des.header.frame_id = "world";
 
   for (int i = 0; i < m_horizon_len; i++) {
 
-    geometry_msgs::Pose new_pose;
+    geometry_msgs::Pose filt_des_pose;
+    geometry_msgs::Pose des_pose;
 
-    new_pose.position.x = des_x_filtered(i, 0);
-    new_pose.position.y = des_y_filtered(i, 0);
-    new_pose.position.z = des_z_filtered(i, 0);
+    filt_des_pose.position.x = des_x_filtered(i, 0);
+    filt_des_pose.position.y = des_y_filtered(i, 0);
+    filt_des_pose.position.z = des_z_filtered(i, 0);
 
-    new_pose.orientation = ros_convert::calculate_quaternion(m_desired_traj_heading(i));
+    des_pose.position.x = m_desired_traj_x(i, 0);
+    des_pose.position.y = m_desired_traj_y(i, 0);
+    des_pose.position.z = m_desired_traj_z(i, 0);
 
-    debug_trajectory_out.poses.push_back(new_pose);
+    filt_des_pose.orientation =
+      ros_convert::calculate_quaternion(m_desired_traj_heading(i));
+    des_pose.orientation = ros_convert::calculate_quaternion(m_desired_traj_heading(i));
+
+    debug_des_filtered.poses.push_back(filt_des_pose);
+    debug_des.poses.push_back(des_pose);
   }
-  m_mpc_desired_traj_pub.publish(debug_trajectory_out);
+
+  m_mpc_desired_filtered_traj_pub.publish(debug_des_filtered);
+  m_mpc_desired_traj_pub.publish(debug_des);
+
   publish_predicted_trajectory();
+
+  // Assign filtered variables
+  m_desired_traj_filtered_x = des_x_filtered;
+  m_desired_traj_filtered_y = des_y_filtered;
+  m_desired_traj_filtered_z = des_z_filtered;
+  m_desired_traj_filtered_heading = m_desired_traj_heading;
 }
 
 void uav_ros_tracker::MPCTracker::publish_predicted_trajectory()
@@ -458,7 +521,7 @@ void uav_ros_tracker::MPCTracker::interpolate_desired_trajectory()
 
     double first_time = m_dt1 + i * m_dt2;
 
-    int first_idx = floor(first_time / m_trajectory_dt);
+    int first_idx = m_trajectory_idx + floor(first_time / m_trajectory_dt);
     int second_idx = first_idx + 1;
 
     double interp_coeff = std::fmod(first_time / m_trajectory_dt, 1.0);
@@ -481,9 +544,30 @@ void uav_ros_tracker::MPCTracker::interpolate_desired_trajectory()
   }
 }
 
+void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstPtr &msg)
+{
+  trajectory_msgs::MultiDOFJointTrajectory csv_trajectory;
+
+  try {
+    csv_trajectory = trajectory_helper::trajectory_from_csv(msg->data, "world", false);
+  } catch (std::runtime_error &e) {
+    ROS_ERROR_STREAM(
+      "MPCTracker::csv_traj_callback - unable to read trajectory: " << msg->data);
+    return;
+  }
+
+  ROS_INFO("MPCTracker::csv_traj_callback - loading csv trajectory");
+  m_is_trajectory_tracking = false;
+  m_tracking_timer.stop();
+  set_virtual_uav_state(m_curr_odom);
+  load_trajectory(csv_trajectory);
+}
+
 void uav_ros_tracker::MPCTracker::trajectory_callback(
   const trajectory_msgs::MultiDOFJointTrajectoryConstPtr &msg)
 {
+  m_is_trajectory_tracking = false;
+  m_tracking_timer.stop();
   set_virtual_uav_state(m_curr_odom);
   load_trajectory(*msg);
 }
@@ -619,7 +703,18 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
 
   // TODO: trajectory_msgs::MultiDOFJointTrajectory does not have delta
   double trajectory_dt = 0.2;
-  int trajectory_size = traj_msg.points.size();
+
+  // Interpolate trajectory according to constraints and step size
+  auto constraints = m_reconfigure_handler->getData();
+
+  // Trajectory speed - dont generate a max speed trajectory
+  const double max_speed = sqrt(constraints.xy_velocity * constraints.xy_velocity * 2
+                                + constraints.z_velocity * constraints.z_velocity)
+                           / 1.75;
+  auto interpolated_msg =
+    trajectory_helper::interpolate_points(traj_msg, max_speed * trajectory_dt);
+
+  int trajectory_size = interpolated_msg.points.size();
 
   ROS_INFO_STREAM("MPCTracker::load_trajectory - recieve trajectory with "
                   << trajectory_size << " points.");
@@ -633,7 +728,7 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
 
   // Add all trajectory points
   for (int i = 0; i < trajectory_size; i++) {
-    auto point = traj_msg.points.at(i);
+    auto point = interpolated_msg.points.at(i);
     m_desired_traj_whole_x(i) = point.transforms.front().translation.x;
     m_desired_traj_whole_y(i) = point.transforms.front().translation.y;
     m_desired_traj_whole_z(i) = point.transforms.front().translation.z;
@@ -653,8 +748,14 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
       m_desired_traj_whole_heading(i + trajectory_size - 1);
   }
 
+  set_single_ref_point(m_desired_traj_whole_x(0),
+    m_desired_traj_whole_y(0),
+    m_desired_traj_whole_z(0),
+    m_desired_traj_whole_heading(0));
+
   // Start the tracking timer
-  m_is_trajectory_tracking = true;
+  m_is_trajectory_tracking = false;
+  m_goto_trajectory_start = true;
   m_trajectory_size = trajectory_size;
   m_trajectory_idx = 0;
   m_trajectory_dt = trajectory_dt;

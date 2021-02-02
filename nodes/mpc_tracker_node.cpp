@@ -1,4 +1,5 @@
 #include <uav_ros_tracker/mpc_tracker.hpp>
+#include <uav_ros_lib/topic_handler.hpp>
 
 int main(int argc, char **argv)
 {
