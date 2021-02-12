@@ -1,5 +1,6 @@
 # Parameters for mpc_tracker from https://github.com/ctu-mrs/mrs_uav_trackers
 rate: 100.0
+frame_id: "world"
 
 model:
 

@@ -1,11 +1,19 @@
 <launch>
   <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
   <arg name="tracker_config" default="$(find uav_ros_tracker)/config/mpc_tracker_config.yaml"/>
-
+  <arg name="position_command" default="position_hold/trajectory"/>
+  <arg name="odom" default="mavros/global_position/local"/>
+  <arg name="input_trajectory" default="tracker/input_trajectory"/>
+  <arg name="input_pose" default="tracker/input_pose"/>
+  
   <!-- mpc_tracker node -->
   <node name="mpc_tracker" pkg="uav_ros_tracker" type="mpc_tracker" 
       output="screen" ns="$(arg namespace)">
     <rosparam file="$(arg tracker_config)" command="load"/>
+    <remap from="tracker/input_trajectory" to="$(arg input_trajectory)"/>
+    <remap from="tracker/input_pose" to="$(arg input_pose)"/>
+    <remap from="position_command" to="$(arg position_command)"/>
+    <remap from="odometry" to="$(arg odom)"/>
   </node>
 
 </launch>

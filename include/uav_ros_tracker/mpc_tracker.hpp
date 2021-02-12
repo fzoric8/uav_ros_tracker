@@ -35,6 +35,40 @@ public:
    */
   explicit MPCTracker(ros::NodeHandle& nh);
 
+  /**
+   * @brief Activate the MPCTracker.
+   * 
+   */
+  void activate();
+
+  /**
+   * @brief Deactivate the MPCTracker
+   * 
+   */
+  void deactivate();
+
+  /**
+   * @brief Reset the MPCTracker
+   * 
+   */
+  void reset();
+
+  /**
+   * @brief Check if MPCTracker is active
+   * 
+   * @return true if active
+   * @return false otherwise
+   */
+  bool is_active();
+
+  /**
+   * @brief Check if MPCTracker is tracking
+   * 
+   * @return true if tracking
+   * @return false otherwise
+   */
+  bool is_tracking();
+  
 private:
   void initialize_parameters();
 
@@ -76,11 +110,12 @@ private:
 
   ros::NodeHandle m_nh;
   double m_tracker_rate;
-
+  std::string m_frame_id;
+  
   /* MPCTracker flags */
   bool m_is_initialized;
   bool m_is_trajectory_tracking;
-  bool m_is_active = true;
+  bool m_is_active = false;
   bool m_goto_trajectory_start;
 
   /* Solver parameters */

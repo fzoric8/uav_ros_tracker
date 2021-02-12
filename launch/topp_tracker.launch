@@ -1,6 +1,6 @@
 <launch>
     <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
-    <arg name="input_trajectory" default="tracker/input/trajectory"/>
+    <arg name="input_trajectory" default="tracker/input_trajectory"/>
     <arg name="output_point" default="position_hold/trajectory"/>
     <arg name="odom" default="mavros/global_position/local"/>
     <arg name="tracker_config" default="$(find uav_ros_tracker)/config/topp_config_default.yaml" />
@@ -12,7 +12,7 @@
     <!-- Trajectory point publisher -->
     <node name="toppra_uav_ros_tracker" pkg="uav_ros_tracker" type="topp_tracker.py" 
         ns="$(arg namespace)" output="screen">
-        <remap from="input/trajectory" to="$(arg input_trajectory)"/>
+        <remap from="tracker/input_trajectory" to="$(arg input_trajectory)"/>
         <remap from="output/point" to="$(arg output_point)"/>
         <remap from="odometry" to="$(arg odom)"/>
 

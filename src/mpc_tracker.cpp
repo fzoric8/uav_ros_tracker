@@ -45,9 +45,9 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
 
   // Initialize subscribers
   m_odom_sub = m_nh.subscribe("odometry", 1, &MPCTracker::odom_callback, this);
-  m_pose_sub = m_nh.subscribe("tracker/pose_input", 1, &MPCTracker::pose_callback, this);
+  m_pose_sub = m_nh.subscribe("tracker/input_pose", 1, &MPCTracker::pose_callback, this);
   m_traj_sub =
-    m_nh.subscribe("tracker/trajectory_input", 1, &MPCTracker::trajectory_callback, this);
+    m_nh.subscribe("tracker/input_trajectory", 1, &MPCTracker::trajectory_callback, this);
   m_csv_traj_sub =
     m_nh.subscribe("tracker/csv_input", 1, &MPCTracker::csv_traj_callback, this);
 
@@ -75,6 +75,21 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
   m_tracking_timer =
     m_nh.createTimer(ros::Rate(1.0), &MPCTracker::tracking_timer, this, false, false);
 }
+
+void uav_ros_tracker::MPCTracker::activate()
+{
+  ROS_INFO("MPCTracker::activate");
+  m_is_active = true;
+}
+void uav_ros_tracker::MPCTracker::deactivate()
+{
+  ROS_INFO("MPCTracker::deactivate");
+  m_is_active = false;
+}
+void uav_ros_tracker::MPCTracker::reset() { ROS_INFO("MPCTracker::reset"); }
+
+bool uav_ros_tracker::MPCTracker::is_active() { return m_is_active; }
+bool uav_ros_tracker::MPCTracker::is_tracking() { return m_is_trajectory_tracking; }
 
 void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unused */)
 {
@@ -108,13 +123,14 @@ void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unus
                                      << "]");
   if (m_trajectory_idx == m_trajectory_size) {
     m_is_trajectory_tracking = false;
+    m_is_active = false;
     m_trajectory_idx = m_trajectory_size - 1;
     m_tracking_timer.stop();
     ROS_INFO("MPCTracker::tracking_timer - trajectory tracking done");
   }
 
   geometry_msgs::PoseStamped debug_traj_ref;
-  debug_traj_ref.header.frame_id = "world";
+  debug_traj_ref.header.frame_id = m_frame_id;
   debug_traj_ref.header.stamp = ros::Time::now();
   debug_traj_ref.pose.position.x = m_desired_traj_whole_x(m_trajectory_idx);
   debug_traj_ref.pose.position.y = m_desired_traj_whole_y(m_trajectory_idx);
@@ -165,7 +181,7 @@ void uav_ros_tracker::MPCTracker::publish_command_reference()
 
   // Concstruct the pose command
   geometry_msgs::PoseStamped virtual_uav_pose;
-  virtual_uav_pose.header.frame_id = "world";
+  virtual_uav_pose.header.frame_id = m_frame_id;
   virtual_uav_pose.header.stamp = ros::Time::now();
   virtual_uav_pose.pose.position.x = m_curr_odom.pose.pose.position.x;
   virtual_uav_pose.pose.position.y = m_curr_odom.pose.pose.position.y;
@@ -378,11 +394,11 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
   // Publish desired trajectory
   geometry_msgs::PoseArray debug_des_filtered;
   debug_des_filtered.header.stamp = ros::Time::now();
-  debug_des_filtered.header.frame_id = "world";
+  debug_des_filtered.header.frame_id = m_frame_id;
 
   geometry_msgs::PoseArray debug_des;
   debug_des.header.stamp = ros::Time::now();
-  debug_des.header.frame_id = "world";
+  debug_des.header.frame_id = m_frame_id;
 
   for (int i = 0; i < m_horizon_len; i++) {
 
@@ -422,7 +438,7 @@ void uav_ros_tracker::MPCTracker::publish_predicted_trajectory()
   // Publish predicted trajectory
   geometry_msgs::PoseArray debug_trajectory_out;
   debug_trajectory_out.header.stamp = ros::Time::now();
-  debug_trajectory_out.header.frame_id = "world";
+  debug_trajectory_out.header.frame_id = m_frame_id;
 
   for (int i = 0; i < m_horizon_len; i++) {
 
@@ -549,7 +565,7 @@ void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstP
   trajectory_msgs::MultiDOFJointTrajectory csv_trajectory;
 
   try {
-    csv_trajectory = trajectory_helper::trajectory_from_csv(msg->data, "world", false);
+    csv_trajectory = trajectory_helper::trajectory_from_csv(msg->data, m_frame_id, false);
   } catch (std::runtime_error &e) {
     ROS_ERROR_STREAM(
       "MPCTracker::csv_traj_callback - unable to read trajectory: " << msg->data);
@@ -686,11 +702,15 @@ void uav_ros_tracker::MPCTracker::odom_callback(const nav_msgs::OdometryConstPtr
 void uav_ros_tracker::MPCTracker::pose_callback(
   const geometry_msgs::PoseStampedConstPtr &msg)
 {
+  m_tracking_timer.stop();
+  m_is_trajectory_tracking = false;
+
   set_virtual_uav_state(m_curr_odom);
   set_single_ref_point(msg->pose.position.x,
     msg->pose.position.y,
     msg->pose.position.z,
     ros_convert::calculateYaw(msg->pose.orientation));
+  m_is_active = true;
 }
 
 void uav_ros_tracker::MPCTracker::load_trajectory(
@@ -701,6 +721,11 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
     return;
   }
 
+  if (traj_msg.points.empty()) {
+    ROS_WARN("MPCTracker::load_trajectory - no points given");
+    return;
+  }
+
   // TODO: trajectory_msgs::MultiDOFJointTrajectory does not have delta
   double trajectory_dt = 0.2;
 
@@ -708,9 +733,15 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   auto constraints = m_reconfigure_handler->getData();
 
   // Trajectory speed - dont generate a max speed trajectory
-  const double max_speed = sqrt(constraints.xy_velocity * constraints.xy_velocity * 2
-                                + constraints.z_velocity * constraints.z_velocity)
-                           / 1.75;
+  double max_speed = sqrt(constraints.xy_velocity * constraints.xy_velocity
+                          + constraints.z_velocity * constraints.z_velocity)
+                     / 1.4;
+  // if (max_speed > constraints.xy_velocity) {
+  //   max_speed = constraints.xy_velocity;
+  // } else if (max_speed > constraints.z_velocity) {
+  //   max_speed = constraints.z_velocity;
+  // }
+
   auto interpolated_msg =
     trajectory_helper::interpolate_points(traj_msg, max_speed * trajectory_dt);
 
@@ -747,6 +778,11 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
     m_desired_traj_whole_heading(i + trajectory_size) =
       m_desired_traj_whole_heading(i + trajectory_size - 1);
   }
+  
+  if (m_is_trajectory_tracking) {
+    m_tracking_timer.stop();
+    m_is_trajectory_tracking = false;
+  }
 
   set_single_ref_point(m_desired_traj_whole_x(0),
     m_desired_traj_whole_y(0),
@@ -759,13 +795,14 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   m_trajectory_size = trajectory_size;
   m_trajectory_idx = 0;
   m_trajectory_dt = trajectory_dt;
+  m_is_active = true;
   m_tracking_timer.setPeriod(ros::Duration(trajectory_dt));
   m_tracking_timer.start();
 
 
   geometry_msgs::PoseArray debug_trajectory_out;
   debug_trajectory_out.header.stamp = ros::Time::now();
-  debug_trajectory_out.header.frame_id = "world";
+  debug_trajectory_out.header.frame_id = m_frame_id;
 
   for (int i = 0; i < trajectory_size; i++) {
 
@@ -828,6 +865,7 @@ void uav_ros_tracker::MPCTracker::set_single_ref_point(double x,
 void uav_ros_tracker::MPCTracker::initialize_parameters()
 {
   ros::NodeHandle nh_private("~");
+  param_util::getParamOrThrow(nh_private, "frame_id", m_frame_id);
   param_util::getParamOrThrow(nh_private, "rate", m_tracker_rate);
   m_dt1 = 1.0 / m_tracker_rate;
 
