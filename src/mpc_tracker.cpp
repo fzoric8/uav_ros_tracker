@@ -123,7 +123,6 @@ void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unus
                                      << "]");
   if (m_trajectory_idx == m_trajectory_size) {
     m_is_trajectory_tracking = false;
-    m_is_active = false;
     m_trajectory_idx = m_trajectory_size - 1;
     m_tracking_timer.stop();
     ROS_INFO("MPCTracker::tracking_timer - trajectory tracking done");
@@ -545,18 +544,12 @@ void uav_ros_tracker::MPCTracker::interpolate_desired_trajectory()
     if (second_idx >= m_trajectory_size) { second_idx = m_trajectory_size - 1; }
     if (first_idx >= m_trajectory_size) { first_idx = m_trajectory_size - 1; }
 
+    
+    m_desired_traj_x(i, 0) = m_desired_traj_whole_x(m_trajectory_idx + i);
+    m_desired_traj_y(i, 0) = m_desired_traj_whole_y(m_trajectory_idx + i);
+    m_desired_traj_z(i, 0) = m_desired_traj_whole_z(m_trajectory_idx + i);
 
-    m_desired_traj_x(i, 0) = (1 - interp_coeff) * m_desired_traj_whole_x(first_idx)
-                             + interp_coeff * m_desired_traj_whole_x(second_idx);
-    m_desired_traj_y(i, 0) = (1 - interp_coeff) * m_desired_traj_whole_y(first_idx)
-                             + interp_coeff * m_desired_traj_whole_y(second_idx);
-    m_desired_traj_z(i, 0) = (1 - interp_coeff) * m_desired_traj_whole_z(first_idx)
-                             + interp_coeff * m_desired_traj_whole_z(second_idx);
-
-    m_desired_traj_heading(i, 0) =
-      nonlinear_filters::interpolate_heading(m_desired_traj_whole_heading(first_idx),
-        m_desired_traj_whole_heading(second_idx),
-        interp_coeff);
+    m_desired_traj_heading(i, 0) = m_desired_traj_whole_heading(m_trajectory_idx + i);
   }
 }
 
@@ -733,17 +726,16 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   auto constraints = m_reconfigure_handler->getData();
 
   // Trajectory speed - dont generate a max speed trajectory
-  double max_speed = sqrt(constraints.xy_velocity * constraints.xy_velocity
-                          + constraints.z_velocity * constraints.z_velocity)
-                     / 1.4;
+
   // if (max_speed > constraints.xy_velocity) {
   //   max_speed = constraints.xy_velocity;
   // } else if (max_speed > constraints.z_velocity) {
   //   max_speed = constraints.z_velocity;
   // }
 
-  auto interpolated_msg =
-    trajectory_helper::interpolate_points(traj_msg, max_speed * trajectory_dt);
+  auto interpolated_msg = trajectory_helper::interpolate_points(traj_msg,
+    0.8 * sqrt(2.) * constraints.xy_velocity * trajectory_dt,
+    0.8 * constraints.z_velocity * trajectory_dt);
 
   int trajectory_size = interpolated_msg.points.size();
 
@@ -778,7 +770,7 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
     m_desired_traj_whole_heading(i + trajectory_size) =
       m_desired_traj_whole_heading(i + trajectory_size - 1);
   }
-  
+
   if (m_is_trajectory_tracking) {
     m_tracking_timer.stop();
     m_is_trajectory_tracking = false;
