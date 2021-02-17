@@ -1,4 +1,4 @@
-/* Produced by CVXGEN, 2018-11-06 10:21:36 -0500.  */
+/* Produced by CVXGEN, 2021-02-16 11:22:01 -0500.  */
 /* CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2017 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
@@ -69,6 +69,26 @@ typedef struct Params_t {
   double x_ss_38[4];
   double x_ss_39[4];
   double x_ss_40[4];
+  double x_ss_41[4];
+  double x_ss_42[4];
+  double x_ss_43[4];
+  double x_ss_44[4];
+  double x_ss_45[4];
+  double x_ss_46[4];
+  double x_ss_47[4];
+  double x_ss_48[4];
+  double x_ss_49[4];
+  double x_ss_50[4];
+  double x_ss_51[4];
+  double x_ss_52[4];
+  double x_ss_53[4];
+  double x_ss_54[4];
+  double x_ss_55[4];
+  double x_ss_56[4];
+  double x_ss_57[4];
+  double x_ss_58[4];
+  double x_ss_59[4];
+  double x_ss_60[4];
   double Af[9];
   double x_0[4];
   double Bf[1];
@@ -82,7 +102,7 @@ typedef struct Params_t {
   double x_min_4[1];
   double u_max[1];
   double u_min[1];
-  double *x_ss[41];
+  double *x_ss[61];
   double *x[1];
 } Params;
 typedef struct Vars_t {
@@ -126,6 +146,26 @@ typedef struct Vars_t {
   double *x_38; /* 4 rows. */
   double *x_39; /* 4 rows. */
   double *x_40; /* 4 rows. */
+  double *x_41; /* 4 rows. */
+  double *x_42; /* 4 rows. */
+  double *x_43; /* 4 rows. */
+  double *x_44; /* 4 rows. */
+  double *x_45; /* 4 rows. */
+  double *x_46; /* 4 rows. */
+  double *x_47; /* 4 rows. */
+  double *x_48; /* 4 rows. */
+  double *x_49; /* 4 rows. */
+  double *x_50; /* 4 rows. */
+  double *x_51; /* 4 rows. */
+  double *x_52; /* 4 rows. */
+  double *x_53; /* 4 rows. */
+  double *x_54; /* 4 rows. */
+  double *x_55; /* 4 rows. */
+  double *x_56; /* 4 rows. */
+  double *x_57; /* 4 rows. */
+  double *x_58; /* 4 rows. */
+  double *x_59; /* 4 rows. */
+  double *x_60; /* 4 rows. */
   double *u_0; /* 1 rows. */
   double *u_1; /* 1 rows. */
   double *u_2; /* 1 rows. */
@@ -166,29 +206,49 @@ typedef struct Vars_t {
   double *u_37; /* 1 rows. */
   double *u_38; /* 1 rows. */
   double *u_39; /* 1 rows. */
-  double *x[41];
-  double *u[40];
+  double *u_40; /* 1 rows. */
+  double *u_41; /* 1 rows. */
+  double *u_42; /* 1 rows. */
+  double *u_43; /* 1 rows. */
+  double *u_44; /* 1 rows. */
+  double *u_45; /* 1 rows. */
+  double *u_46; /* 1 rows. */
+  double *u_47; /* 1 rows. */
+  double *u_48; /* 1 rows. */
+  double *u_49; /* 1 rows. */
+  double *u_50; /* 1 rows. */
+  double *u_51; /* 1 rows. */
+  double *u_52; /* 1 rows. */
+  double *u_53; /* 1 rows. */
+  double *u_54; /* 1 rows. */
+  double *u_55; /* 1 rows. */
+  double *u_56; /* 1 rows. */
+  double *u_57; /* 1 rows. */
+  double *u_58; /* 1 rows. */
+  double *u_59; /* 1 rows. */
+  double *x[61];
+  double *u[60];
 } Vars;
 typedef struct Workspace_t {
-  double h[320];
-  double s_inv[320];
-  double s_inv_z[320];
-  double b[160];
-  double q[200];
-  double rhs[1000];
-  double x[1000];
+  double h[480];
+  double s_inv[480];
+  double s_inv_z[480];
+  double b[240];
+  double q[300];
+  double rhs[1500];
+  double x[1500];
   double *s;
   double *z;
   double *y;
-  double lhs_aff[1000];
-  double lhs_cc[1000];
-  double buffer[1000];
-  double buffer2[1000];
-  double KKT[1991];
-  double L[1720];
-  double d[1000];
-  double v[1000];
-  double d_inv[1000];
+  double lhs_aff[1500];
+  double lhs_cc[1500];
+  double buffer[1500];
+  double buffer2[1500];
+  double KKT[2991];
+  double L[2600];
+  double d[1500];
+  double v[1500];
+  double d_inv[1500];
   double gap;
   double optval;
   double ineq_resid_squared;
@@ -235,6 +295,26 @@ typedef struct Workspace_t {
   double quad_193524883456[1];
   double quad_637564002304[1];
   double quad_646561718272[1];
+  double quad_381625589760[1];
+  double quad_132038795264[1];
+  double quad_878621437952[1];
+  double quad_436127985664[1];
+  double quad_349528518656[1];
+  double quad_319730221056[1];
+  double quad_65456545792[1];
+  double quad_284783128576[1];
+  double quad_814384173056[1];
+  double quad_641270112256[1];
+  double quad_322570489856[1];
+  double quad_963317829632[1];
+  double quad_678875508736[1];
+  double quad_814618464256[1];
+  double quad_736403521536[1];
+  double quad_831340048384[1];
+  double quad_706108452864[1];
+  double quad_223798493184[1];
+  double quad_449856450560[1];
+  double quad_345172385792[1];
   int converged;
 } Workspace;
 typedef struct Settings_t {
@@ -257,14 +337,6 @@ extern Vars vars;
 extern Params params;
 extern Workspace work;
 extern Settings settings;
-/* Function definitions in ldl.c: */
-void ldl_solve(double *target, double *var);
-void ldl_factor(void);
-double check_factorization(void);
-void matrix_multiply(double *result, double *source);
-double check_residual(double *target, double *multiplicand);
-void fill_KKT(void);
-
 /* Function definitions in matrix_support.c: */
 void multbymA(double *lhs, double *rhs);
 void multbymAT(double *lhs, double *rhs);
@@ -275,6 +347,14 @@ void fillq(void);
 void fillh(void);
 void fillb(void);
 void pre_ops(void);
+
+/* Function definitions in ldl.c: */
+void ldl_solve(double *target, double *var);
+void ldl_factor(void);
+double check_factorization(void);
+void matrix_multiply(double *result, double *source);
+double check_residual(double *target, double *multiplicand);
+void fill_KKT(void);
 
 /* Function definitions in solver.c: */
 double eval_gap(void);

@@ -4,7 +4,7 @@
 %
 % solves the convex optimization problem
 %
-%   minimize(quad_form(x_1 - x_ss_1, Q) + quad_form(x_2 - x_ss_2, Q) + quad_form(x_3 - x_ss_3, Q) + quad_form(x_4 - x_ss_4, Q) + quad_form(x_5 - x_ss_5, Q) + quad_form(x_6 - x_ss_6, Q) + quad_form(x_7 - x_ss_7, Q) + quad_form(x_8 - x_ss_8, Q) + quad_form(x_9 - x_ss_9, Q) + quad_form(x_10 - x_ss_10, Q) + quad_form(x_11 - x_ss_11, Q) + quad_form(x_12 - x_ss_12, Q) + quad_form(x_13 - x_ss_13, Q) + quad_form(x_14 - x_ss_14, Q) + quad_form(x_15 - x_ss_15, Q) + quad_form(x_16 - x_ss_16, Q) + quad_form(x_17 - x_ss_17, Q) + quad_form(x_18 - x_ss_18, Q) + quad_form(x_19 - x_ss_19, Q) + quad_form(x_20 - x_ss_20, Q) + quad_form(x_21 - x_ss_21, Q) + quad_form(x_22 - x_ss_22, Q) + quad_form(x_23 - x_ss_23, Q) + quad_form(x_24 - x_ss_24, Q) + quad_form(x_25 - x_ss_25, Q) + quad_form(x_26 - x_ss_26, Q) + quad_form(x_27 - x_ss_27, Q) + quad_form(x_28 - x_ss_28, Q) + quad_form(x_29 - x_ss_29, Q) + quad_form(x_30 - x_ss_30, Q) + quad_form(x_31 - x_ss_31, Q) + quad_form(x_32 - x_ss_32, Q) + quad_form(x_33 - x_ss_33, Q) + quad_form(x_34 - x_ss_34, Q) + quad_form(x_35 - x_ss_35, Q) + quad_form(x_36 - x_ss_36, Q) + quad_form(x_37 - x_ss_37, Q) + quad_form(x_38 - x_ss_38, Q) + quad_form(x_39 - x_ss_39, Q) + quad_form(x_40 - x_ss_40, Q))
+%   minimize(quad_form(x_1 - x_ss_1, Q) + quad_form(x_2 - x_ss_2, Q) + quad_form(x_3 - x_ss_3, Q) + quad_form(x_4 - x_ss_4, Q) + quad_form(x_5 - x_ss_5, Q) + quad_form(x_6 - x_ss_6, Q) + quad_form(x_7 - x_ss_7, Q) + quad_form(x_8 - x_ss_8, Q) + quad_form(x_9 - x_ss_9, Q) + quad_form(x_10 - x_ss_10, Q) + quad_form(x_11 - x_ss_11, Q) + quad_form(x_12 - x_ss_12, Q) + quad_form(x_13 - x_ss_13, Q) + quad_form(x_14 - x_ss_14, Q) + quad_form(x_15 - x_ss_15, Q) + quad_form(x_16 - x_ss_16, Q) + quad_form(x_17 - x_ss_17, Q) + quad_form(x_18 - x_ss_18, Q) + quad_form(x_19 - x_ss_19, Q) + quad_form(x_20 - x_ss_20, Q) + quad_form(x_21 - x_ss_21, Q) + quad_form(x_22 - x_ss_22, Q) + quad_form(x_23 - x_ss_23, Q) + quad_form(x_24 - x_ss_24, Q) + quad_form(x_25 - x_ss_25, Q) + quad_form(x_26 - x_ss_26, Q) + quad_form(x_27 - x_ss_27, Q) + quad_form(x_28 - x_ss_28, Q) + quad_form(x_29 - x_ss_29, Q) + quad_form(x_30 - x_ss_30, Q) + quad_form(x_31 - x_ss_31, Q) + quad_form(x_32 - x_ss_32, Q) + quad_form(x_33 - x_ss_33, Q) + quad_form(x_34 - x_ss_34, Q) + quad_form(x_35 - x_ss_35, Q) + quad_form(x_36 - x_ss_36, Q) + quad_form(x_37 - x_ss_37, Q) + quad_form(x_38 - x_ss_38, Q) + quad_form(x_39 - x_ss_39, Q) + quad_form(x_40 - x_ss_40, Q) + quad_form(x_41 - x_ss_41, Q) + quad_form(x_42 - x_ss_42, Q) + quad_form(x_43 - x_ss_43, Q) + quad_form(x_44 - x_ss_44, Q) + quad_form(x_45 - x_ss_45, Q) + quad_form(x_46 - x_ss_46, Q) + quad_form(x_47 - x_ss_47, Q) + quad_form(x_48 - x_ss_48, Q) + quad_form(x_49 - x_ss_49, Q) + quad_form(x_50 - x_ss_50, Q) + quad_form(x_51 - x_ss_51, Q) + quad_form(x_52 - x_ss_52, Q) + quad_form(x_53 - x_ss_53, Q) + quad_form(x_54 - x_ss_54, Q) + quad_form(x_55 - x_ss_55, Q) + quad_form(x_56 - x_ss_56, Q) + quad_form(x_57 - x_ss_57, Q) + quad_form(x_58 - x_ss_58, Q) + quad_form(x_59 - x_ss_59, Q) + quad_form(x_60 - x_ss_60, Q))
 %   subject to
 %     x_1 == Af*x_0 + Bf*u_0
 %     x_2 == A*x_1 + B*u_1
@@ -46,6 +46,26 @@
 %     x_38 == A*x_37 + B*u_37
 %     x_39 == A*x_38 + B*u_38
 %     x_40 == A*x_39 + B*u_39
+%     x_41 == A*x_40 + B*u_40
+%     x_42 == A*x_41 + B*u_41
+%     x_43 == A*x_42 + B*u_42
+%     x_44 == A*x_43 + B*u_43
+%     x_45 == A*x_44 + B*u_44
+%     x_46 == A*x_45 + B*u_45
+%     x_47 == A*x_46 + B*u_46
+%     x_48 == A*x_47 + B*u_47
+%     x_49 == A*x_48 + B*u_48
+%     x_50 == A*x_49 + B*u_49
+%     x_51 == A*x_50 + B*u_50
+%     x_52 == A*x_51 + B*u_51
+%     x_53 == A*x_52 + B*u_52
+%     x_54 == A*x_53 + B*u_53
+%     x_55 == A*x_54 + B*u_54
+%     x_56 == A*x_55 + B*u_55
+%     x_57 == A*x_56 + B*u_56
+%     x_58 == A*x_57 + B*u_57
+%     x_59 == A*x_58 + B*u_58
+%     x_60 == A*x_59 + B*u_59
 %     x_1(2) <= x_max_2
 %     x_2(2) <= x_max_2
 %     x_3(2) <= x_max_2
@@ -86,6 +106,26 @@
 %     x_38(2) <= x_max_2
 %     x_39(2) <= x_max_2
 %     x_40(2) <= x_max_2
+%     x_41(2) <= x_max_2
+%     x_42(2) <= x_max_2
+%     x_43(2) <= x_max_2
+%     x_44(2) <= x_max_2
+%     x_45(2) <= x_max_2
+%     x_46(2) <= x_max_2
+%     x_47(2) <= x_max_2
+%     x_48(2) <= x_max_2
+%     x_49(2) <= x_max_2
+%     x_50(2) <= x_max_2
+%     x_51(2) <= x_max_2
+%     x_52(2) <= x_max_2
+%     x_53(2) <= x_max_2
+%     x_54(2) <= x_max_2
+%     x_55(2) <= x_max_2
+%     x_56(2) <= x_max_2
+%     x_57(2) <= x_max_2
+%     x_58(2) <= x_max_2
+%     x_59(2) <= x_max_2
+%     x_60(2) <= x_max_2
 %     x_1(2) >= -x_min_2
 %     x_2(2) >= -x_min_2
 %     x_3(2) >= -x_min_2
@@ -126,6 +166,26 @@
 %     x_38(2) >= -x_min_2
 %     x_39(2) >= -x_min_2
 %     x_40(2) >= -x_min_2
+%     x_41(2) >= -x_min_2
+%     x_42(2) >= -x_min_2
+%     x_43(2) >= -x_min_2
+%     x_44(2) >= -x_min_2
+%     x_45(2) >= -x_min_2
+%     x_46(2) >= -x_min_2
+%     x_47(2) >= -x_min_2
+%     x_48(2) >= -x_min_2
+%     x_49(2) >= -x_min_2
+%     x_50(2) >= -x_min_2
+%     x_51(2) >= -x_min_2
+%     x_52(2) >= -x_min_2
+%     x_53(2) >= -x_min_2
+%     x_54(2) >= -x_min_2
+%     x_55(2) >= -x_min_2
+%     x_56(2) >= -x_min_2
+%     x_57(2) >= -x_min_2
+%     x_58(2) >= -x_min_2
+%     x_59(2) >= -x_min_2
+%     x_60(2) >= -x_min_2
 %     x_1(3) <= x_max_3
 %     x_2(3) <= x_max_3
 %     x_3(3) <= x_max_3
@@ -166,6 +226,26 @@
 %     x_38(3) <= x_max_3
 %     x_39(3) <= x_max_3
 %     x_40(3) <= x_max_3
+%     x_41(3) <= x_max_3
+%     x_42(3) <= x_max_3
+%     x_43(3) <= x_max_3
+%     x_44(3) <= x_max_3
+%     x_45(3) <= x_max_3
+%     x_46(3) <= x_max_3
+%     x_47(3) <= x_max_3
+%     x_48(3) <= x_max_3
+%     x_49(3) <= x_max_3
+%     x_50(3) <= x_max_3
+%     x_51(3) <= x_max_3
+%     x_52(3) <= x_max_3
+%     x_53(3) <= x_max_3
+%     x_54(3) <= x_max_3
+%     x_55(3) <= x_max_3
+%     x_56(3) <= x_max_3
+%     x_57(3) <= x_max_3
+%     x_58(3) <= x_max_3
+%     x_59(3) <= x_max_3
+%     x_60(3) <= x_max_3
 %     x_1(3) >= -x_min_3
 %     x_2(3) >= -x_min_3
 %     x_3(3) >= -x_min_3
@@ -206,6 +286,26 @@
 %     x_38(3) >= -x_min_3
 %     x_39(3) >= -x_min_3
 %     x_40(3) >= -x_min_3
+%     x_41(3) >= -x_min_3
+%     x_42(3) >= -x_min_3
+%     x_43(3) >= -x_min_3
+%     x_44(3) >= -x_min_3
+%     x_45(3) >= -x_min_3
+%     x_46(3) >= -x_min_3
+%     x_47(3) >= -x_min_3
+%     x_48(3) >= -x_min_3
+%     x_49(3) >= -x_min_3
+%     x_50(3) >= -x_min_3
+%     x_51(3) >= -x_min_3
+%     x_52(3) >= -x_min_3
+%     x_53(3) >= -x_min_3
+%     x_54(3) >= -x_min_3
+%     x_55(3) >= -x_min_3
+%     x_56(3) >= -x_min_3
+%     x_57(3) >= -x_min_3
+%     x_58(3) >= -x_min_3
+%     x_59(3) >= -x_min_3
+%     x_60(3) >= -x_min_3
 %     x_1(4) <= x_max_4
 %     x_2(4) <= x_max_4
 %     x_3(4) <= x_max_4
@@ -246,6 +346,26 @@
 %     x_38(4) <= x_max_4
 %     x_39(4) <= x_max_4
 %     x_40(4) <= x_max_4
+%     x_41(4) <= x_max_4
+%     x_42(4) <= x_max_4
+%     x_43(4) <= x_max_4
+%     x_44(4) <= x_max_4
+%     x_45(4) <= x_max_4
+%     x_46(4) <= x_max_4
+%     x_47(4) <= x_max_4
+%     x_48(4) <= x_max_4
+%     x_49(4) <= x_max_4
+%     x_50(4) <= x_max_4
+%     x_51(4) <= x_max_4
+%     x_52(4) <= x_max_4
+%     x_53(4) <= x_max_4
+%     x_54(4) <= x_max_4
+%     x_55(4) <= x_max_4
+%     x_56(4) <= x_max_4
+%     x_57(4) <= x_max_4
+%     x_58(4) <= x_max_4
+%     x_59(4) <= x_max_4
+%     x_60(4) <= x_max_4
 %     x_1(4) >= -x_min_4
 %     x_2(4) >= -x_min_4
 %     x_3(4) >= -x_min_4
@@ -286,6 +406,26 @@
 %     x_38(4) >= -x_min_4
 %     x_39(4) >= -x_min_4
 %     x_40(4) >= -x_min_4
+%     x_41(4) >= -x_min_4
+%     x_42(4) >= -x_min_4
+%     x_43(4) >= -x_min_4
+%     x_44(4) >= -x_min_4
+%     x_45(4) >= -x_min_4
+%     x_46(4) >= -x_min_4
+%     x_47(4) >= -x_min_4
+%     x_48(4) >= -x_min_4
+%     x_49(4) >= -x_min_4
+%     x_50(4) >= -x_min_4
+%     x_51(4) >= -x_min_4
+%     x_52(4) >= -x_min_4
+%     x_53(4) >= -x_min_4
+%     x_54(4) >= -x_min_4
+%     x_55(4) >= -x_min_4
+%     x_56(4) >= -x_min_4
+%     x_57(4) >= -x_min_4
+%     x_58(4) >= -x_min_4
+%     x_59(4) >= -x_min_4
+%     x_60(4) >= -x_min_4
 %     u_0(1) <= u_max
 %     u_1(1) <= u_max
 %     u_2(1) <= u_max
@@ -326,6 +466,26 @@
 %     u_37(1) <= u_max
 %     u_38(1) <= u_max
 %     u_39(1) <= u_max
+%     u_40(1) <= u_max
+%     u_41(1) <= u_max
+%     u_42(1) <= u_max
+%     u_43(1) <= u_max
+%     u_44(1) <= u_max
+%     u_45(1) <= u_max
+%     u_46(1) <= u_max
+%     u_47(1) <= u_max
+%     u_48(1) <= u_max
+%     u_49(1) <= u_max
+%     u_50(1) <= u_max
+%     u_51(1) <= u_max
+%     u_52(1) <= u_max
+%     u_53(1) <= u_max
+%     u_54(1) <= u_max
+%     u_55(1) <= u_max
+%     u_56(1) <= u_max
+%     u_57(1) <= u_max
+%     u_58(1) <= u_max
+%     u_59(1) <= u_max
 %     u_0(1) >= -u_min
 %     u_1(1) >= -u_min
 %     u_2(1) >= -u_min
@@ -366,6 +526,26 @@
 %     u_37(1) >= -u_min
 %     u_38(1) >= -u_min
 %     u_39(1) >= -u_min
+%     u_40(1) >= -u_min
+%     u_41(1) >= -u_min
+%     u_42(1) >= -u_min
+%     u_43(1) >= -u_min
+%     u_44(1) >= -u_min
+%     u_45(1) >= -u_min
+%     u_46(1) >= -u_min
+%     u_47(1) >= -u_min
+%     u_48(1) >= -u_min
+%     u_49(1) >= -u_min
+%     u_50(1) >= -u_min
+%     u_51(1) >= -u_min
+%     u_52(1) >= -u_min
+%     u_53(1) >= -u_min
+%     u_54(1) >= -u_min
+%     u_55(1) >= -u_min
+%     u_56(1) >= -u_min
+%     u_57(1) >= -u_min
+%     u_58(1) >= -u_min
+%     u_59(1) >= -u_min
 %
 % with variables
 %      u_0   1 x 1
@@ -408,6 +588,26 @@
 %     u_37   1 x 1
 %     u_38   1 x 1
 %     u_39   1 x 1
+%     u_40   1 x 1
+%     u_41   1 x 1
+%     u_42   1 x 1
+%     u_43   1 x 1
+%     u_44   1 x 1
+%     u_45   1 x 1
+%     u_46   1 x 1
+%     u_47   1 x 1
+%     u_48   1 x 1
+%     u_49   1 x 1
+%     u_50   1 x 1
+%     u_51   1 x 1
+%     u_52   1 x 1
+%     u_53   1 x 1
+%     u_54   1 x 1
+%     u_55   1 x 1
+%     u_56   1 x 1
+%     u_57   1 x 1
+%     u_58   1 x 1
+%     u_59   1 x 1
 %      x_1   4 x 1
 %      x_2   4 x 1
 %      x_3   4 x 1
@@ -448,6 +648,26 @@
 %     x_38   4 x 1
 %     x_39   4 x 1
 %     x_40   4 x 1
+%     x_41   4 x 1
+%     x_42   4 x 1
+%     x_43   4 x 1
+%     x_44   4 x 1
+%     x_45   4 x 1
+%     x_46   4 x 1
+%     x_47   4 x 1
+%     x_48   4 x 1
+%     x_49   4 x 1
+%     x_50   4 x 1
+%     x_51   4 x 1
+%     x_52   4 x 1
+%     x_53   4 x 1
+%     x_54   4 x 1
+%     x_55   4 x 1
+%     x_56   4 x 1
+%     x_57   4 x 1
+%     x_58   4 x 1
+%     x_59   4 x 1
+%     x_60   4 x 1
 %
 % and parameters
 %        A   4 x 4
@@ -504,6 +724,26 @@
 %  x_ss_38   4 x 1
 %  x_ss_39   4 x 1
 %  x_ss_40   4 x 1
+%  x_ss_41   4 x 1
+%  x_ss_42   4 x 1
+%  x_ss_43   4 x 1
+%  x_ss_44   4 x 1
+%  x_ss_45   4 x 1
+%  x_ss_46   4 x 1
+%  x_ss_47   4 x 1
+%  x_ss_48   4 x 1
+%  x_ss_49   4 x 1
+%  x_ss_50   4 x 1
+%  x_ss_51   4 x 1
+%  x_ss_52   4 x 1
+%  x_ss_53   4 x 1
+%  x_ss_54   4 x 1
+%  x_ss_55   4 x 1
+%  x_ss_56   4 x 1
+%  x_ss_57   4 x 1
+%  x_ss_58   4 x 1
+%  x_ss_59   4 x 1
+%  x_ss_60   4 x 1
 %
 % Note:
 %   - Check status.converged, which will be 1 if optimization succeeded.
@@ -512,9 +752,9 @@
 %   - To change iterations, use settings.max_iters = 20.
 %   - You may wish to compare with cvxsolve to check the solver is correct.
 %
-% Specify params.A, ..., params.x_ss_40, then run
+% Specify params.A, ..., params.x_ss_60, then run
 %   [vars, status] = csolve(params, settings)
-% Produced by CVXGEN, 2018-11-06 10:21:12 -0500.
+% Produced by CVXGEN, 2021-02-16 11:21:46 -0500.
 % CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com.
 % The code in this file is Copyright (C) 2006-2017 Jacob Mattingley.
 % CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial

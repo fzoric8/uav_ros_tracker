@@ -27,7 +27,7 @@ public:
   double getFirstControlInput();
 
 private:
-  static const int    horizon_len = 40;
+  static const int    horizon_len = 60;
   std::vector<double> myQ;
   int                 dim;
 };

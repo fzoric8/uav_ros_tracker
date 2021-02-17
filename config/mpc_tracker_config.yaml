@@ -52,7 +52,7 @@ model:
 
 solver:
 
-  horizon_len: 40 # Horizon length is hardcoded in solver code, this value is used in other parts of the code
+  horizon_len: 60 # Horizon length is hardcoded in solver code, this value is used in other parts of the code
 
   # dt1: 0.01 # dt1 is set as 1/main_rate
   dt2: 0.2

@@ -1,4 +1,4 @@
-# Produced by CVXGEN, 2018-11-06 10:21:12 -0500.
+# Produced by CVXGEN, 2021-02-16 11:21:46 -0500.
 # CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com.
 # The code in this file is Copyright (C) 2006-2017 Jacob Mattingley.
 # CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial
@@ -10,7 +10,7 @@
 dimensions
   m = 1  # inputs
   n = 4   # states
-  T = 40  # prediction horizon length
+  T = 60  # prediction horizon length
 end
 
 parameters
