@@ -39,7 +39,7 @@ public:
    * @brief Activate the MPCTracker.
    * 
    */
-  void activate();
+  std::tuple<bool, std::string> activate();
 
   /**
    * @brief Deactivate the MPCTracker
@@ -113,9 +113,10 @@ private:
   std::string m_frame_id;
   
   /* MPCTracker flags */
-  bool m_is_initialized;
-  bool m_is_trajectory_tracking;
+  bool m_is_initialized = false;
+  bool m_is_trajectory_tracking = false;
   bool m_is_active = false;
+  bool m_request_permission = true;
   bool m_goto_trajectory_start;
 
   /* Solver parameters */

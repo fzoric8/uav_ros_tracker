@@ -10,9 +10,9 @@ std::string carrot_status = "OFF";
 bool enable_srv_cb(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &resp)
 {
   if (req.data && carrot_status == "HOLD") {
-    mpc_tracker->activate();
-    resp.message = "MPC Tracker activated";
-    resp.success = true;
+    auto [success, message] = mpc_tracker->activate();
+    resp.message = message;
+    resp.success = success;
   } else if (req.data && carrot_status != "HOLD") {
     mpc_tracker->deactivate();
     resp.message = "MPC Tracker deactivated - position hold is disabled";
