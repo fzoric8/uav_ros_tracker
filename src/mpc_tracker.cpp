@@ -99,6 +99,13 @@ void uav_ros_tracker::MPCTracker::deactivate()
 {
   ROS_INFO("MPCTracker::deactivate");
   m_is_active = false;
+  m_is_trajectory_tracking = false;
+  m_trajectory_idx = 0;
+  m_tracking_timer.stop();
+
+  set_virtual_uav_state(m_curr_odom);
+  set_single_ref_point(
+    m_mpc_state(0, 0), m_mpc_state(4, 0), m_mpc_state(8, 0), m_mpc_heading_state(0, 0));
 }
 void uav_ros_tracker::MPCTracker::reset() { ROS_INFO("MPCTracker::reset"); }
 
@@ -107,6 +114,12 @@ bool uav_ros_tracker::MPCTracker::is_tracking() { return m_is_trajectory_trackin
 
 void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unused */)
 {
+  if (!m_is_active) {
+    ROS_WARN_THROTTLE(
+      1.0, "MPCTracker::tracking_timer - tracker not active, but trajectory recieved");
+    return;
+  }
+
   nav_msgs::Odometry curr_virtual_odom;
   curr_virtual_odom.pose.pose.position.x = m_mpc_state(0, 0);
   curr_virtual_odom.pose.pose.position.y = m_mpc_state(4, 0);
@@ -167,7 +180,28 @@ void uav_ros_tracker::MPCTracker::mpc_timer(const ros::TimerEvent & /* unused */
 
   ROS_INFO_THROTTLE(10.0, "MPCTracker::mpc_timers");
 
+
   if (m_is_trajectory_tracking) { interpolate_desired_trajectory(); }
+
+  // If trajectory tracking is done and request permission is enabled
+  if (!m_is_trajectory_tracking && m_request_permission) {
+    nav_msgs::Odometry curr_virtual_odom;
+    curr_virtual_odom.pose.pose.position.x = m_mpc_state(0, 0);
+    curr_virtual_odom.pose.pose.position.y = m_mpc_state(4, 0);
+    curr_virtual_odom.pose.pose.position.z = m_mpc_state(8, 0);
+
+    trajectory_msgs::MultiDOFJointTrajectoryPoint traj_point;
+    traj_point.transforms.push_back(geometry_msgs::Transform());
+    traj_point.transforms.front().translation.x = m_desired_traj_x(m_horizon_len - 1);
+    traj_point.transforms.front().translation.y = m_desired_traj_y(m_horizon_len - 1);
+    traj_point.transforms.front().translation.z = m_desired_traj_z(m_horizon_len - 1);
+
+    if (trajectory_helper::is_close_to_reference(traj_point, curr_virtual_odom, 0.01)) {
+      ROS_INFO("MPCTracker::mpc_timers - tracking is done!");
+      deactivate();
+      return;
+    }
+  }
 
   calculate_mpc();
   iterate_virtual_uav_model();
@@ -733,8 +767,6 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
 
   if (traj_msg.points.empty()) {
     ROS_WARN("MPCTracker::load_trajectory - no points given");
-    set_single_ref_point(
-      m_mpc_state(0, 0), m_mpc_state(4, 0), m_mpc_state(8, 0), m_mpc_heading_state(0, 0));
     deactivate();
     return;
   }
@@ -807,7 +839,6 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   m_trajectory_size = trajectory_size;
   m_trajectory_idx = 0;
   m_trajectory_dt = trajectory_dt;
-  m_is_active = true;
   m_tracking_timer.setPeriod(ros::Duration(trajectory_dt));
   m_tracking_timer.start();
 
@@ -877,7 +908,7 @@ void uav_ros_tracker::MPCTracker::initialize_parameters()
   param_util::getParamOrThrow(nh_private, "frame_id", m_frame_id);
   param_util::getParamOrThrow(nh_private, "rate", m_tracker_rate);
   param_util::getParamOrThrow(nh_private, "request_permission", m_request_permission);
-  if (!m_request_permission) { m_is_active = true; }
+  if (m_request_permission) { m_is_active = false; }
   m_dt1 = 1.0 / m_tracker_rate;
 
   // Load translation parameters

@@ -115,7 +115,7 @@ private:
   /* MPCTracker flags */
   bool m_is_initialized = false;
   bool m_is_trajectory_tracking = false;
-  bool m_is_active = false;
+  bool m_is_active = true;
   bool m_request_permission = true;
   bool m_goto_trajectory_start;
 
