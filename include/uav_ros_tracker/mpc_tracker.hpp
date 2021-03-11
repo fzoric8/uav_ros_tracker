@@ -2,7 +2,6 @@
 #define MPC_TRACKER_HPP
 
 #include <ros/ros.h>
-#include <nav_msgs/Odometry.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <std_msgs/String.h>
@@ -78,7 +77,7 @@ private:
 
   /* topic callbacks */
   void trajectory_callback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr &msg);
-  void odom_callback(const nav_msgs::OdometryConstPtr &msg);
+  void carrot_callback(const trajectory_msgs::MultiDOFJointTrajectoryPointConstPtr &msg);
   void pose_callback(const geometry_msgs::PoseStampedConstPtr &msg);
   void csv_traj_callback(const std_msgs::StringConstPtr &msg);
   
@@ -87,7 +86,7 @@ private:
 
   void calculate_mpc();
   void iterate_virtual_uav_model();
-  void set_virtual_uav_state(const nav_msgs::Odometry &msg);
+  void set_virtual_uav_state(const trajectory_msgs::MultiDOFJointTrajectoryPoint &msg);
   void set_single_ref_point(double x, double y, double z, double heading);
 
   /* trajectory helper methods */
@@ -186,8 +185,9 @@ private:
   ros::Timer m_tracking_timer;
 
   /** Subscribers **/
-  nav_msgs::Odometry m_curr_odom;
-  ros::Subscriber m_odom_sub;
+  ros::Time m_last_state_time;
+  trajectory_msgs::MultiDOFJointTrajectoryPoint m_curr_state;
+  ros::Subscriber m_carrot_sub;
   ros::Subscriber m_pose_sub;
   ros::Subscriber m_traj_sub;
   ros::Subscriber m_csv_traj_sub;

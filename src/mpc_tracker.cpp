@@ -44,7 +44,8 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
   m_is_initialized = false;
 
   // Initialize subscribers
-  m_odom_sub = m_nh.subscribe("odometry", 1, &MPCTracker::odom_callback, this);
+  m_carrot_sub =
+    m_nh.subscribe("carrot/trajectory", 1, &MPCTracker::carrot_callback, this);
   m_pose_sub = m_nh.subscribe("tracker/input_pose", 1, &MPCTracker::pose_callback, this);
   m_traj_sub =
     m_nh.subscribe("tracker/input_trajectory", 1, &MPCTracker::trajectory_callback, this);
@@ -86,13 +87,13 @@ std::tuple<bool, std::string> uav_ros_tracker::MPCTracker::activate()
 
   // If a lot of time passed from last odom measurement, something is wrong and don't
   // activate
-  if ((ros::Time::now() - m_curr_odom.header.stamp).toSec() > 0.1) {
+  if ((ros::Time::now() - m_last_state_time).toSec() > 0.1) {
     return { false, "MPCTracker::activate - last odometry message is too old." };
   }
 
   m_is_active = true;
 
-  set_virtual_uav_state(m_curr_odom);
+  set_virtual_uav_state(m_curr_state);
   return { true, "MPCTracker::activate - success" };
 }
 void uav_ros_tracker::MPCTracker::deactivate()
@@ -103,7 +104,7 @@ void uav_ros_tracker::MPCTracker::deactivate()
   m_trajectory_idx = 0;
   m_tracking_timer.stop();
 
-  set_virtual_uav_state(m_curr_odom);
+  set_virtual_uav_state(m_curr_state);
   set_single_ref_point(
     m_mpc_state(0, 0), m_mpc_state(4, 0), m_mpc_state(8, 0), m_mpc_heading_state(0, 0));
 }
@@ -219,23 +220,16 @@ void uav_ros_tracker::MPCTracker::publish_command_reference()
   }
 
   // Construct the point command
-  trajectory_msgs::MultiDOFJointTrajectoryPoint trajectory_point_ref =
-    ros_convert::to_trajectory_point(m_curr_odom.pose.pose.position.x,
-      m_curr_odom.pose.pose.position.y,
-      m_curr_odom.pose.pose.position.z,
-      m_curr_odom.pose.pose.orientation.x,
-      m_curr_odom.pose.pose.orientation.y,
-      m_curr_odom.pose.pose.orientation.z,
-      m_curr_odom.pose.pose.orientation.w);
+  trajectory_msgs::MultiDOFJointTrajectoryPoint trajectory_point_ref = m_curr_state;
 
   // Concstruct the pose command
   geometry_msgs::PoseStamped virtual_uav_pose;
   virtual_uav_pose.header.frame_id = m_frame_id;
   virtual_uav_pose.header.stamp = ros::Time::now();
-  virtual_uav_pose.pose.position.x = m_curr_odom.pose.pose.position.x;
-  virtual_uav_pose.pose.position.y = m_curr_odom.pose.pose.position.y;
-  virtual_uav_pose.pose.position.z = m_curr_odom.pose.pose.position.z;
-  virtual_uav_pose.pose.orientation = m_curr_odom.pose.pose.orientation;
+  virtual_uav_pose.pose.position.x = m_curr_state.transforms.front().translation.x;
+  virtual_uav_pose.pose.position.y = m_curr_state.transforms.front().translation.y;
+  virtual_uav_pose.pose.position.z = m_curr_state.transforms.front().translation.z;
+  virtual_uav_pose.pose.orientation = m_curr_state.transforms.front().rotation;
 
   if (is_state_finite) {
     // TODO: Make a msg to accomodate jerk commands
@@ -605,6 +599,19 @@ void uav_ros_tracker::MPCTracker::interpolate_desired_trajectory()
 
 void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstPtr &msg)
 {
+  // If a lot of time passed from last odom measurement, something is wrong and don't
+  // activate
+  if ((ros::Time::now() - m_last_state_time).toSec() > 0.1) {
+    ROS_WARN(
+      "MPCTracker::pose_callaback - rejected because carrot/trajectory is unavailable");
+    return;
+  }
+
+  if (!m_is_initialized) {
+    ROS_WARN("MPCTracker::pose_callback - not initialized!");
+    return;
+  }
+
   trajectory_msgs::MultiDOFJointTrajectory csv_trajectory;
 
   try {
@@ -618,16 +625,35 @@ void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstP
   ROS_INFO("MPCTracker::csv_traj_callback - loading csv trajectory");
   m_is_trajectory_tracking = false;
   m_tracking_timer.stop();
-  set_virtual_uav_state(m_curr_odom);
+  set_virtual_uav_state(m_curr_state);
   load_trajectory(csv_trajectory);
 }
 
 void uav_ros_tracker::MPCTracker::trajectory_callback(
   const trajectory_msgs::MultiDOFJointTrajectoryConstPtr &msg)
 {
+  if (msg->points.empty()) {
+    ROS_WARN("MPCTracker::trajectory_callback - no points given");
+    deactivate();
+    return;
+  }
+
+  // If a lot of time passed from last odom measurement, something is wrong and don't
+  // activate
+  if ((ros::Time::now() - m_last_state_time).toSec() > 0.1) {
+    ROS_WARN(
+      "MPCTracker::pose_callaback - rejected because carrot/trajectory is unavailable");
+    return;
+  }
+
+  if (!m_is_initialized) {
+    ROS_WARN("MPCTracker::pose_callback - not initialized!");
+    return;
+  }
+
   m_is_trajectory_tracking = false;
   m_tracking_timer.stop();
-  set_virtual_uav_state(m_curr_odom);
+  set_virtual_uav_state(m_curr_state);
   load_trajectory(*msg);
 }
 
@@ -736,23 +762,38 @@ Eigen::MatrixXd uav_ros_tracker::MPCTracker::filter_desired_traj_z(
   return filtered_trajectory;
 }
 
-void uav_ros_tracker::MPCTracker::odom_callback(const nav_msgs::OdometryConstPtr &msg)
+void uav_ros_tracker::MPCTracker::carrot_callback(
+  const trajectory_msgs::MultiDOFJointTrajectoryPointConstPtr &msg)
 {
   if (!m_is_initialized) {
     set_virtual_uav_state(*msg);
     set_single_ref_point(
       m_mpc_state(0, 0), m_mpc_state(4, 0), m_mpc_state(8, 0), m_mpc_heading_state(0, 0));
   }
-  m_curr_odom = *msg;
+  m_curr_state = *msg;
+  m_last_state_time = ros::Time::now();
 }
 
 void uav_ros_tracker::MPCTracker::pose_callback(
   const geometry_msgs::PoseStampedConstPtr &msg)
 {
+  // If a lot of time passed from last odom measurement, something is wrong and don't
+  // activate
+  if ((ros::Time::now() - m_last_state_time).toSec() > 0.1) {
+    ROS_WARN(
+      "MPCTracker::pose_callaback - rejected because carrot/trajectory is unavailable");
+    return;
+  }
+
+  if (!m_is_initialized) {
+    ROS_WARN("MPCTracker::pose_callback - not initialized!");
+    return;
+  }
+
   m_tracking_timer.stop();
   m_is_trajectory_tracking = false;
 
-  set_virtual_uav_state(m_curr_odom);
+  set_virtual_uav_state(m_curr_state);
   set_single_ref_point(msg->pose.position.x,
     msg->pose.position.y,
     msg->pose.position.z,
@@ -867,26 +908,27 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   ROS_INFO("MPCTracker::load_trajectory - start trajectory tracking");
 }
 
-void uav_ros_tracker::MPCTracker::set_virtual_uav_state(const nav_msgs::Odometry &msg)
+void uav_ros_tracker::MPCTracker::set_virtual_uav_state(
+  const trajectory_msgs::MultiDOFJointTrajectoryPoint &msg)
 {
-  m_mpc_state(0, 0) = msg.pose.pose.position.x;
-  m_mpc_state(1, 0) = msg.twist.twist.linear.x;
+  m_mpc_state(0, 0) = msg.transforms.front().translation.x;
+  m_mpc_state(1, 0) = msg.velocities.front().linear.x;
   m_mpc_state(2, 0) = 0;
   m_mpc_state(3, 0) = 0;
 
-  m_mpc_state(4, 0) = msg.pose.pose.position.y;
-  m_mpc_state(5, 0) = msg.twist.twist.linear.y;
+  m_mpc_state(4, 0) = msg.transforms.front().translation.y;
+  m_mpc_state(5, 0) = msg.velocities.front().linear.y;
   m_mpc_state(6, 0) = 0;
   m_mpc_state(7, 0) = 0;
 
-  m_mpc_state(8, 0) = msg.pose.pose.position.z;
-  m_mpc_state(9, 0) = msg.twist.twist.linear.z;
+  m_mpc_state(8, 0) = msg.transforms.front().translation.z;
+  m_mpc_state(9, 0) = msg.velocities.front().linear.z;
   m_mpc_state(10, 0) = 0;
   m_mpc_state(11, 0) = 0;
 
-  auto yaw = ros_convert::calculateYaw(msg.pose.pose.orientation);
+  auto yaw = ros_convert::calculateYaw(msg.transforms.front().rotation);
   m_mpc_heading_state(0, 0) = yaw;
-  m_mpc_heading_state(1, 0) = msg.twist.twist.linear.z;
+  m_mpc_heading_state(1, 0) = msg.velocities.front().angular.z;
   m_mpc_heading_state(2, 0) = 0;
   m_mpc_heading_state(3, 0) = 0;
 
