@@ -81,6 +81,10 @@ std::tuple<bool, std::string> uav_ros_tracker::MPCTracker::activate()
 {
   ROS_INFO("MPCTracker::activate");
 
+  if (m_is_active) {
+    return { true, "MPCTracker::activate - tracker already active" };
+  }
+
   if (!m_is_initialized) {
     return { false, "MPCTracker::activate - odometry callback missing!" };
   }
@@ -627,6 +631,8 @@ void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstP
   m_tracking_timer.stop();
   set_virtual_uav_state(m_curr_state);
   load_trajectory(csv_trajectory);
+
+  if (!m_request_permission) { activate(); }
 }
 
 void uav_ros_tracker::MPCTracker::trajectory_callback(
@@ -655,6 +661,8 @@ void uav_ros_tracker::MPCTracker::trajectory_callback(
   m_tracking_timer.stop();
   set_virtual_uav_state(m_curr_state);
   load_trajectory(*msg);
+
+  if (!m_request_permission) { activate(); }
 }
 
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
@@ -798,6 +806,8 @@ void uav_ros_tracker::MPCTracker::pose_callback(
     msg->pose.position.y,
     msg->pose.position.z,
     ros_convert::calculateYaw(msg->pose.orientation));
+  
+  if (!m_request_permission) { activate(); }
 }
 
 void uav_ros_tracker::MPCTracker::load_trajectory(
