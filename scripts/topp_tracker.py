@@ -12,8 +12,8 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint, \
     MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 from geometry_msgs.msg import Transform, Twist, PoseStamped
 from nav_msgs.msg import Path
-from std_srvs.srv import Empty
-from std_srvs.srv import EmptyResponse
+from std_srvs.srv import Empty, SetBool
+from std_srvs.srv import EmptyResponse, SetBoolResponse
 from math import pi, ceil, floor, sqrt
 import numpy as np
 
@@ -71,7 +71,7 @@ class ToppTracker:
         self.path_pub = rospy.Publisher("tracker/path", Path, queue_size=1)
 
         self.enable_trajectory = False
-        self.enable_service = rospy.Service("tracker/enable", Empty, self.enable_service_cb)
+        self.enable_service = rospy.Service("tracker/enable", SetBool, self.enable_service_cb)
         self.topp_reset = rospy.Service("tracker/reset", Empty, self.reset_service_cb)
         
     def reset_service_cb(self, req):
@@ -95,8 +95,17 @@ class ToppTracker:
         self.activity_pub.publish(msg)
 
     def enable_service_cb(self, req):
-        self.enable_trajectory = True
-        return EmptyResponse()
+        self.enable_trajectory = req.data
+        resp = SetBoolResponse()
+        resp.success = True
+
+        if req.data:
+            resp.message = "Topp Tracker enabled successfully."
+        else:
+            resp.message = "Topp Tracker disabled successfully."
+            
+        return resp
+        
 
     def fix_topp_yaw(self, curr_yaw, previous_yaw):
         delta = previous_yaw - curr_yaw
