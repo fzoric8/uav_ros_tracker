@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10.0)
 project(uav_ros_tracker)
 
 find_package(catkin REQUIRED COMPONENTS roscpp dynamic_reconfigure uav_ros_lib
-                                        dynamic_reconfigure)
+                                        dynamic_reconfigure mavros_msgs) 
 
 generate_dynamic_reconfigure_options(cfg/MPCTrackerParameters.cfg)
 
