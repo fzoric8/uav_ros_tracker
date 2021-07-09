@@ -52,6 +52,21 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
   m_csv_traj_sub =
     m_nh.subscribe("tracker/csv_input", 1, &MPCTracker::csv_traj_callback, this);
 
+  m_curr_state.transforms = std::vector<geometry_msgs::Transform>();
+  m_curr_state.transforms.emplace_back();
+  m_curr_state.velocities = std::vector<geometry_msgs::Twist>();
+  m_curr_state.velocities.emplace_back();
+  m_curr_state.accelerations = std::vector<geometry_msgs::Twist>();
+  m_curr_state.accelerations.emplace_back();
+
+  m_curr_state.transforms.front().translation.x = 0;
+  m_curr_state.transforms.front().translation.y = 0;
+  m_curr_state.transforms.front().translation.z = 0;
+  m_curr_state.transforms.front().rotation.x = 0;
+  m_curr_state.transforms.front().rotation.y = 0;
+  m_curr_state.transforms.front().rotation.z = 0;
+  m_curr_state.transforms.front().rotation.w = 1;
+  
   // Initialize publishers
   m_traj_point_pub =
     m_nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("position_command", 1);
