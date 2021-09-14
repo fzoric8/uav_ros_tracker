@@ -1,0 +1,5 @@
+<library path="lib/libwaypoint_manager_nodelet">
+  <class name="uav_ros_tracker/WaypointManager" type="uav_ros_tracker::WaypointManager" base_class_type="nodelet::Nodelet">
+    <description>Waypoint Manager nodelet</description>
+  </class>
+</library>

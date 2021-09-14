@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
-<package>
+
+<package format="2">
   <name>uav_ros_tracker</name>
   <version>0.0.0</version>
   <description>The main reference generator for the "uav_ros_stack" package</description>
@@ -8,7 +9,8 @@
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
   <maintainer email="lovro.markovic@fer.hr">Lovro Markovic</maintainer>
-
+  <depend>pluginlib</depend>
+  <depend>nodelet</depend>
 
   <!-- One license tag required, multiple allowed, one license per tag -->
   <!-- Commonly used license strings: -->
@@ -23,15 +25,17 @@
   <build_depend>geographiclib-tools</build_depend>
   <build_depend>mavros</build_depend>
 
-  <run_depend>uav_ros_msgs</run_depend>
-  <run_depend>uav_ros_lib</run_depend>
-  <run_depend>geographiclib</run_depend>
-  <run_depend>geographiclib-tools</run_depend>
-  <run_depend>uav_ros_msgs</run_depend>
-  <run_depend>mavros</run_depend>
+  <exec_depend>uav_ros_msgs</exec_depend>
+  <exec_depend>uav_ros_lib</exec_depend>
+  <exec_depend>geographiclib</exec_depend>
+  <exec_depend>geographiclib-tools</exec_depend>
+  <exec_depend>uav_ros_msgs</exec_depend>
+  <exec_depend>mavros</exec_depend>
   
-  <!-- The export tag contains other, unspecified, tags -->
+    <!-- The export tag contains other, unspecified, tags -->
   <export>
     <!-- Other tools can request additional information be placed here -->
+    <nodelet plugin="${prefix}/nodelets.xml" />
+
   </export>
 </package>

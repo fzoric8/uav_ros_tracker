@@ -145,7 +145,7 @@ class ToppTracker:
             z.append((1 - delta) * start_p.transforms[0].translation.z + delta * end_p.transforms[0].translation.z)
             yaw.append((1 - delta) * start_yaw + delta * end_yaw)
 
-            if len(yaw) > 1:
+            if len(yaw) > 2:
                 yaw[-1] = self.fix_topp_yaw(yaw[-1], yaw[-2])
             
         return x, y, z, yaw
