@@ -19,7 +19,7 @@ void WaypointPublisher::reset()
 
 std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr>
   WaypointPublisher::publishWaypoint(
-    const geometry_msgs::PoseStamped& current_carrot_pose,
+    const nav_msgs::Odometry&         current_odometry,
     bool                              tracking_enabled,
     bool                              control_enabled)
 {
@@ -47,7 +47,7 @@ std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr>
       false, "No waypoints available.", {});
   }
 
-  auto distance_to_wp = this->calc_distance(current_carrot_pose, *current_waypoint_ptr);
+  auto distance_to_wp = this->calc_distance(current_odometry, *current_waypoint_ptr);
   // If we are are flying and still haven't reached the distance
   if (m_flying_to_wp && distance_to_wp >= DISTANCE_TOL) {
     return std::make_tuple(false, "Flying to current waypoint!", current_waypoint_ptr);
@@ -115,10 +115,10 @@ void WaypointPublisher::addWaypoints(uav_ros_msgs::WaypointsPtr waypoints)
   for (const auto& waypoint : waypoints->waypoints) { addWaypoint(waypoint); }
 }
 
-double WaypointPublisher::calc_distance(const geometry_msgs::PoseStamped& carrot_pose,
+double WaypointPublisher::calc_distance(const nav_msgs::Odometry& carrot_pose,
                                         const uav_ros_msgs::Waypoint&     waypoint)
 {
-  return sqrt(pow(carrot_pose.pose.position.x - waypoint.pose.pose.position.x, 2)
-              + pow(carrot_pose.pose.position.y - waypoint.pose.pose.position.y, 2)
-              + pow(carrot_pose.pose.position.z - waypoint.pose.pose.position.z, 2));
+  return sqrt(pow(carrot_pose.pose.pose.position.x - waypoint.pose.pose.position.x, 2)
+              + pow(carrot_pose.pose.pose.position.y - waypoint.pose.pose.position.y, 2)
+              + pow(carrot_pose.pose.pose.position.z - waypoint.pose.pose.position.z, 2));
 }

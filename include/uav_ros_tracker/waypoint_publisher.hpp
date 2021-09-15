@@ -19,21 +19,21 @@ public:
   void addWaypoint(uav_ros_msgs::Waypoint waypoint);
   void addWaypoints(uav_ros_msgs::WaypointsPtr waypoints);
   std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr> publishWaypoint(
-    const geometry_msgs::PoseStamped& current_carrot_pose,
+    const nav_msgs::Odometry& 	      current_odometry,
     bool                              tracking_enabled = true,
     bool                              control_enabled  = true);
 
 private:
   static constexpr auto WAYPOINT_RATE = 10;
   static constexpr auto THROTTLE_TIME = 5;
-  static constexpr auto DISTANCE_TOL  = 0.1;
+  static constexpr auto DISTANCE_TOL  = 0.3;
   static constexpr auto NAME          = "WaypointPublisher";
 
   ros::NodeHandle m_nh;
   bool            m_flying_to_wp = false;
 
   void   reset();
-  double calc_distance(const geometry_msgs::PoseStamped& odom,
+  double calc_distance(const nav_msgs::Odometry&         odometry,
                        const uav_ros_msgs::Waypoint&     waypoint);
 
   ros::Timer m_waiting_timer;

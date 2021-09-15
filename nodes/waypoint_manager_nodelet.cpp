@@ -32,11 +32,11 @@ private:
   std::mutex      m_carrot_status_mutex;
   void            carrot_status_cb(const std_msgs::StringConstPtr& msg);
 
-  ros::Subscriber                    m_carrot_sub;
-  geometry_msgs::PoseStampedConstPtr m_carrot_pose;
-  bool                               m_carrot_pose_received = false;
-  std::mutex                         m_carrot_pose_mutex;
-  void carrot_pose_sub(const geometry_msgs::PoseStampedConstPtr& msg);
+  ros::Subscriber                    m_odom_sub;
+  nav_msgs::OdometryConstPtr         m_odom;
+  bool                               m_odom_received = false;
+  std::mutex                         m_odom_mutex;
+  void odom_sub(const nav_msgs::OdometryConstPtr& msg);
 
   ros::Timer m_waypoint_timer;
   void       waypoint_loop(const ros::TimerEvent& /* unused */);
@@ -46,17 +46,17 @@ private:
 void uav_ros_tracker::WaypointManager::onInit()
 {
   auto& nh             = getMTNodeHandle();
-  m_tracker_status_sub = nh.subscribe<std_msgs::String>(
+  m_tracker_status_sub = nh.subscribe(
     "tracker/status", 1, &WaypointManager::tracker_status_cb, this);
-  m_carrot_status_sub = nh.subscribe<std_msgs::String>(
+  m_carrot_status_sub = nh.subscribe(
     "carrot/status", 1, &WaypointManager::carrot_status_cb, this);
   m_waypoint_ptr = std::make_unique<WaypointPublisher>(nh, "pose_in");
-  m_waypoint_sub = nh.subscribe<uav_ros_msgs::WaypointPtr>(
+  m_waypoint_sub = nh.subscribe(
     "waypoint", 1, &WaypointManager::waypoint_cb, this);
-  m_waypoints_sub = nh.subscribe<uav_ros_msgs::WaypointsPtr>(
+  m_waypoints_sub = nh.subscribe(
     "waypoints", 1, &WaypointManager::waypoints_cb, this);
-  m_carrot_sub = nh.subscribe<geometry_msgs::PoseStamped>(
-    "carrot/pose", 1, &WaypointManager::carrot_pose_sub, this);
+  m_odom_sub = nh.subscribe(
+    "odometry", 1, &WaypointManager::odom_sub, this);
   m_waypoint_timer = nh.createTimer(ros::Rate(50), &WaypointManager::waypoint_loop, this);
   m_is_initialized = true;
   ROS_INFO("[%s] Initialized.", this->getName().c_str());
@@ -69,15 +69,15 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
     return;
   }
 
-  if (!m_carrot_pose_received) {
-    ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Carrot not recieved.", getName().c_str());
+  if (!m_odom_received) {
+    ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Odometry not recieved.", getName().c_str());
     return;
   }
 
-  geometry_msgs::PoseStamped current_carrot_pose;
+  nav_msgs::Odometry current_odometry;
   {
-    std::lock_guard<std::mutex> lock(m_carrot_pose_mutex);
-    current_carrot_pose = *m_carrot_pose;
+    std::lock_guard<std::mutex> lock(m_odom_mutex);
+    current_odometry = *m_odom;
   }
 
   bool control_enabled = false;
@@ -93,7 +93,7 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
   }
 
   auto [wp_published, message, current_waypoint] = m_waypoint_ptr->publishWaypoint(
-    current_carrot_pose, tracking_enabled, control_enabled);
+    current_odometry, tracking_enabled, control_enabled);
 
   // No waypoint is published
   if (!wp_published || current_waypoint == nullptr) {
@@ -109,12 +109,12 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
                     current_waypoint->pose.pose.position.z);
 }
 
-void uav_ros_tracker::WaypointManager::carrot_pose_sub(
-  const geometry_msgs::PoseStampedConstPtr& msg)
+void uav_ros_tracker::WaypointManager::odom_sub(
+  const nav_msgs::OdometryConstPtr& msg)
 {
-  std::lock_guard<std::mutex> lock(m_carrot_pose_mutex);
-  m_carrot_pose          = msg;
-  m_carrot_pose_received = true;
+  std::lock_guard<std::mutex> lock(m_odom_mutex);
+  m_odom          = msg;
+  m_odom_received = true;
 }
 
 void uav_ros_tracker::WaypointManager::waypoint_cb(const uav_ros_msgs::WaypointPtr msg)

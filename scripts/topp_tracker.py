@@ -188,6 +188,16 @@ class ToppTracker:
         print(y)
         print(yaw)
 
+        if len(x) == 0:
+            x.append(self.carrot_trajectory.transforms[0].translation.x)
+            y.append(self.carrot_trajectory.transforms[0].translation.y)
+            z.append(self.carrot_trajectory.transforms[0].translation.z)
+            yaw.append(tf.transformations.euler_from_quaternion(
+                [self.carrot_trajectory.transforms[0].rotation.x, 
+                self.carrot_trajectory.transforms[0].rotation.y,
+                self.carrot_trajectory.transforms[0].rotation.z,
+                self.carrot_trajectory.transforms[0].rotation.w])[2])
+
         for point in msg.points:
             x.append(point.transforms[0].translation.x)
             y.append(point.transforms[0].translation.y)
@@ -199,7 +209,8 @@ class ToppTracker:
                 point.transforms[0].rotation.w])[2])
 
             # Fix Toppra orientation, at this point atleast two points are in trajectory
-            yaw[-1] = self.fix_topp_yaw(yaw[-1], yaw[-2])
+            if len(yaw) > 2:           
+                yaw[-1] = self.fix_topp_yaw(yaw[-1], yaw[-2])
         
         for x_,y_,z_,yaw_ in zip(x, y, z, yaw):
             print("Recieved point: ", x_, y_, z_, yaw_)
