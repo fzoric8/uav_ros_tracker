@@ -70,7 +70,7 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
   }
 
   if (!m_carrot_pose_received) {
-    ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Odometry not recieved.", getName().c_str());
+    ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Carrot not recieved.", getName().c_str());
     return;
   }
 

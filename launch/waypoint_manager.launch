@@ -2,7 +2,6 @@
 
   <arg name="namespace"   default="$(env UAV_NAMESPACE)"/>
   <arg name="pose_in"     default="tracker/input_pose"/>
-  <arg name="odometry"    default="mavros/global_position/local"/>    
 
   <!-- Debug arguments -->
   <arg name="debug" default="false" />
@@ -33,6 +32,5 @@
     output="screen" launch-prefix="$(arg launch_prefix)" ns="$(arg namespace)">
 
     <remap from="pose_in"   to="$(arg pose_in)"/>
-    <remap from="odometry"  to="$(arg odometry)"/>
   </node>
 </launch>
