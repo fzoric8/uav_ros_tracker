@@ -18,6 +18,7 @@ public:
   void addWaypoint(uav_ros_msgs::WaypointPtr waypoint);
   void addWaypoint(uav_ros_msgs::Waypoint waypoint);
   void addWaypoints(uav_ros_msgs::WaypointsPtr waypoints);
+  void clearWaypoints();
   std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr> publishWaypoint(
     const nav_msgs::Odometry& 	      current_odometry,
     bool                              tracking_enabled = true,

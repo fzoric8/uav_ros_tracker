@@ -18,10 +18,9 @@ void WaypointPublisher::reset()
 }
 
 std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr>
-  WaypointPublisher::publishWaypoint(
-    const nav_msgs::Odometry&         current_odometry,
-    bool                              tracking_enabled,
-    bool                              control_enabled)
+  WaypointPublisher::publishWaypoint(const nav_msgs::Odometry& current_odometry,
+                                     bool                      tracking_enabled,
+                                     bool                      control_enabled)
 {
   if (!control_enabled) {
     reset();
@@ -35,6 +34,7 @@ std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr>
     std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
 
     if (m_waypoint_buffer.empty()) {
+      reset();
       return std::make_tuple<bool, std::string, uav_ros_msgs::WaypointPtr>(
         false, "No waypoints available.", {});
     }
@@ -102,11 +102,11 @@ void WaypointPublisher::addWaypoint(uav_ros_msgs::WaypointPtr waypoint)
   std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
   m_waypoint_buffer.emplace_back(waypoint);
 
-  ROS_INFO("[%s] Waypoint Added [%.2f, %.2f, %.2f]", 
-	NAME,
-	waypoint->pose.pose.position.x,
-	waypoint->pose.pose.position.y,
-	waypoint->pose.pose.position.z);
+  ROS_INFO("[%s] Waypoint Added [%.2f, %.2f, %.2f]",
+           NAME,
+           waypoint->pose.pose.position.x,
+           waypoint->pose.pose.position.y,
+           waypoint->pose.pose.position.z);
 }
 
 void WaypointPublisher::addWaypoint(uav_ros_msgs::Waypoint waypoint)
@@ -114,12 +114,12 @@ void WaypointPublisher::addWaypoint(uav_ros_msgs::Waypoint waypoint)
   std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
   m_waypoint_buffer.emplace_back(
     boost::make_shared<uav_ros_msgs::Waypoint>(std::move(waypoint)));
-  
-  ROS_INFO("[%s] Waypoint Added [%.2f, %.2f, %.2f]", 
-	NAME,
-	waypoint.pose.pose.position.x,
-	waypoint.pose.pose.position.y,
-	waypoint.pose.pose.position.z);
+
+  ROS_INFO("[%s] Waypoint Added [%.2f, %.2f, %.2f]",
+           NAME,
+           waypoint.pose.pose.position.x,
+           waypoint.pose.pose.position.y,
+           waypoint.pose.pose.position.z);
 }
 
 void WaypointPublisher::addWaypoints(uav_ros_msgs::WaypointsPtr waypoints)
@@ -127,8 +127,14 @@ void WaypointPublisher::addWaypoints(uav_ros_msgs::WaypointsPtr waypoints)
   for (const auto& waypoint : waypoints->waypoints) { addWaypoint(waypoint); }
 }
 
-double WaypointPublisher::calc_distance(const nav_msgs::Odometry& carrot_pose,
-                                        const uav_ros_msgs::Waypoint&     waypoint)
+void WaypointPublisher::clearWaypoints() 
+{
+  std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
+  m_waypoint_buffer.clear();
+}
+
+double WaypointPublisher::calc_distance(const nav_msgs::Odometry&     carrot_pose,
+                                        const uav_ros_msgs::Waypoint& waypoint)
 {
   return sqrt(pow(carrot_pose.pose.pose.position.x - waypoint.pose.pose.position.x, 2)
               + pow(carrot_pose.pose.pose.position.y - waypoint.pose.pose.position.y, 2)

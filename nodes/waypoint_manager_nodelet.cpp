@@ -1,6 +1,7 @@
+#include <mutex>
 #include <uav_ros_tracker/waypoint_publisher.hpp>
 #include <nodelet/nodelet.h>
-
+#include <std_srvs/SetBool.h>
 namespace uav_ros_tracker {
 class WaypointManager : public nodelet::Nodelet
 {
@@ -32,11 +33,14 @@ private:
   std::mutex      m_carrot_status_mutex;
   void            carrot_status_cb(const std_msgs::StringConstPtr& msg);
 
-  ros::Subscriber                    m_odom_sub;
-  nav_msgs::OdometryConstPtr         m_odom;
-  bool                               m_odom_received = false;
-  std::mutex                         m_odom_mutex;
-  void odom_sub(const nav_msgs::OdometryConstPtr& msg);
+  ros::Subscriber            m_odom_sub;
+  nav_msgs::OdometryConstPtr m_odom;
+  bool                       m_odom_received = false;
+  std::mutex                 m_odom_mutex;
+  void                       odom_sub(const nav_msgs::OdometryConstPtr& msg);
+
+  ros::ServiceServer m_clear_waypoints_srv;
+  bool clear_waypoints_cb(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& resp);
 
   ros::Timer m_waypoint_timer;
   void       waypoint_loop(const ros::TimerEvent& /* unused */);
@@ -45,19 +49,17 @@ private:
 
 void uav_ros_tracker::WaypointManager::onInit()
 {
-  auto& nh             = getMTNodeHandle();
-  m_tracker_status_sub = nh.subscribe(
-    "tracker/status", 1, &WaypointManager::tracker_status_cb, this);
-  m_carrot_status_sub = nh.subscribe(
-    "carrot/status", 1, &WaypointManager::carrot_status_cb, this);
-  m_waypoint_ptr = std::make_unique<WaypointPublisher>(nh, "pose_in");
-  m_waypoint_sub = nh.subscribe(
-    "waypoint", 1, &WaypointManager::waypoint_cb, this);
-  m_waypoints_sub = nh.subscribe(
-    "waypoints", 1, &WaypointManager::waypoints_cb, this);
-  m_odom_sub = nh.subscribe(
-    "odometry", 1, &WaypointManager::odom_sub, this);
+  auto& nh = getMTNodeHandle();
+  m_tracker_status_sub =
+    nh.subscribe("tracker/status", 1, &WaypointManager::tracker_status_cb, this);
+  m_carrot_status_sub =
+    nh.subscribe("carrot/status", 1, &WaypointManager::carrot_status_cb, this);
+  m_waypoint_ptr   = std::make_unique<WaypointPublisher>(nh, "pose_in");
+  m_waypoint_sub   = nh.subscribe("waypoint", 1, &WaypointManager::waypoint_cb, this);
+  m_waypoints_sub  = nh.subscribe("waypoints", 1, &WaypointManager::waypoints_cb, this);
+  m_odom_sub       = nh.subscribe("odometry", 1, &WaypointManager::odom_sub, this);
   m_waypoint_timer = nh.createTimer(ros::Rate(50), &WaypointManager::waypoint_loop, this);
+  m_clear_waypoints_srv = nh.advertiseService("clear_waypoints", &WaypointManager::clear_waypoints_cb, this);
   m_is_initialized = true;
   ROS_INFO("[%s] Initialized.", this->getName().c_str());
 }
@@ -92,8 +94,8 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
     tracking_enabled = m_tracker_status == TRACKER_READY;
   }
 
-  auto [wp_published, message, current_waypoint] = m_waypoint_ptr->publishWaypoint(
-    current_odometry, tracking_enabled, control_enabled);
+  auto [wp_published, message, current_waypoint] =
+    m_waypoint_ptr->publishWaypoint(current_odometry, tracking_enabled, control_enabled);
 
   // No waypoint is published
   if (!wp_published || current_waypoint == nullptr) {
@@ -109,8 +111,7 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
                     current_waypoint->pose.pose.position.z);
 }
 
-void uav_ros_tracker::WaypointManager::odom_sub(
-  const nav_msgs::OdometryConstPtr& msg)
+void uav_ros_tracker::WaypointManager::odom_sub(const nav_msgs::OdometryConstPtr& msg)
 {
   std::lock_guard<std::mutex> lock(m_odom_mutex);
   m_odom          = msg;
@@ -139,6 +140,20 @@ void uav_ros_tracker::WaypointManager::carrot_status_cb(
 {
   std::lock_guard<std::mutex> lock(m_carrot_status_mutex);
   m_carrot_status = msg->data;
+}
+
+bool uav_ros_tracker::WaypointManager::clear_waypoints_cb(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& resp)
+{
+  if (!req.data) {
+  resp.success = false;
+  resp.message = "Clear not requested!";
+  return true;
+  }
+ 
+  m_waypoint_ptr->clearWaypoints();
+  resp.success = true;
+  resp.message = "Waypoints successfully cleared";
+  return true;
 }
 
 #include <pluginlib/class_list_macros.h>
