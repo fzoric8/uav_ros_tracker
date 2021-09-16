@@ -15,14 +15,18 @@ class WaypointPublisher
 {
 public:
   WaypointPublisher(ros::NodeHandle& nh, const std::string& pose_in);
-  void addWaypoint(uav_ros_msgs::WaypointPtr waypoint);
-  void addWaypoint(uav_ros_msgs::Waypoint waypoint);
-  void addWaypoints(uav_ros_msgs::WaypointsPtr waypoints);
-  void clearWaypoints();
+  void   addWaypoint(uav_ros_msgs::WaypointPtr waypoint);
+  void   addWaypoint(uav_ros_msgs::Waypoint waypoint);
+  void   addWaypoints(uav_ros_msgs::WaypointsPtr waypoints);
+  void   clearWaypoints();
+  bool   isFlying() const;
+  bool   isWaiting() const;
+  double distanceToCurrentWp(const nav_msgs::Odometry& odom);
+  std::optional<uav_ros_msgs::WaypointPtr>                 getCurrentWaypoint();
   std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr> publishWaypoint(
-    const nav_msgs::Odometry& 	      current_odometry,
-    bool                              tracking_enabled = true,
-    bool                              control_enabled  = true);
+    const nav_msgs::Odometry& current_odometry,
+    bool                      tracking_enabled = true,
+    bool                      control_enabled  = true);
 
 private:
   static constexpr auto WAYPOINT_RATE = 10;
@@ -34,8 +38,8 @@ private:
   bool            m_flying_to_wp = false;
 
   void   reset();
-  double calc_distance(const nav_msgs::Odometry&         odometry,
-                       const uav_ros_msgs::Waypoint&     waypoint);
+  double calc_distance(const nav_msgs::Odometry&     odometry,
+                       const uav_ros_msgs::Waypoint& waypoint);
 
   ros::Timer m_waiting_timer;
   bool       m_is_waiting = false;

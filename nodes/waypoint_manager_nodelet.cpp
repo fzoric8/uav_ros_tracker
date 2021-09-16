@@ -1,7 +1,11 @@
+#include "ros/publisher.h"
+#include "uav_ros_msgs/Waypoint.h"
 #include <mutex>
 #include <uav_ros_tracker/waypoint_publisher.hpp>
 #include <nodelet/nodelet.h>
 #include <std_srvs/SetBool.h>
+#include <uav_ros_msgs/WaypointStatus.h>
+
 namespace uav_ros_tracker {
 class WaypointManager : public nodelet::Nodelet
 {
@@ -40,10 +44,13 @@ private:
   void                       odom_sub(const nav_msgs::OdometryConstPtr& msg);
 
   ros::ServiceServer m_clear_waypoints_srv;
-  bool clear_waypoints_cb(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& resp);
+  bool               clear_waypoints_cb(std_srvs::SetBool::Request&  req,
+                                        std_srvs::SetBool::Response& resp);
 
   ros::Timer m_waypoint_timer;
   void       waypoint_loop(const ros::TimerEvent& /* unused */);
+
+  ros::Publisher m_waypoint_status_pub;
 };
 }// namespace uav_ros_tracker
 
@@ -59,7 +66,9 @@ void uav_ros_tracker::WaypointManager::onInit()
   m_waypoints_sub  = nh.subscribe("waypoints", 1, &WaypointManager::waypoints_cb, this);
   m_odom_sub       = nh.subscribe("odometry", 1, &WaypointManager::odom_sub, this);
   m_waypoint_timer = nh.createTimer(ros::Rate(50), &WaypointManager::waypoint_loop, this);
-  m_clear_waypoints_srv = nh.advertiseService("clear_waypoints", &WaypointManager::clear_waypoints_cb, this);
+  m_clear_waypoints_srv =
+    nh.advertiseService("clear_waypoints", &WaypointManager::clear_waypoints_cb, this);
+  m_waypoint_status_pub = nh.advertise<uav_ros_msgs::WaypointStatus>("waypoint_status", 1);
   m_is_initialized = true;
   ROS_INFO("[%s] Initialized.", this->getName().c_str());
 }
@@ -96,6 +105,16 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
 
   auto [wp_published, message, current_waypoint] =
     m_waypoint_ptr->publishWaypoint(current_odometry, tracking_enabled, control_enabled);
+
+  // Create a status message
+  uav_ros_msgs::WaypointStatus wp_status;
+  auto                         current_wp = m_waypoint_ptr->getCurrentWaypoint();
+  wp_status.current_wp =
+    current_wp.has_value() ? *current_wp.value() : uav_ros_msgs::Waypoint{};
+  wp_status.distance_to_wp = m_waypoint_ptr->distanceToCurrentWp(current_odometry);
+  wp_status.flying_to_wp   = m_waypoint_ptr->isFlying();
+  wp_status.waiting_at_wp  = m_waypoint_ptr->isWaiting();
+  m_waypoint_status_pub.publish(wp_status);
 
   // No waypoint is published
   if (!wp_published || current_waypoint == nullptr) {
@@ -142,14 +161,16 @@ void uav_ros_tracker::WaypointManager::carrot_status_cb(
   m_carrot_status = msg->data;
 }
 
-bool uav_ros_tracker::WaypointManager::clear_waypoints_cb(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& resp)
+bool uav_ros_tracker::WaypointManager::clear_waypoints_cb(
+  std_srvs::SetBool::Request&  req,
+  std_srvs::SetBool::Response& resp)
 {
   if (!req.data) {
-  resp.success = false;
-  resp.message = "Clear not requested!";
-  return true;
+    resp.success = false;
+    resp.message = "Clear not requested!";
+    return true;
   }
- 
+
   m_waypoint_ptr->clearWaypoints();
   resp.success = true;
   resp.message = "Waypoints successfully cleared";

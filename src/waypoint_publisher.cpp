@@ -127,16 +127,45 @@ void WaypointPublisher::addWaypoints(uav_ros_msgs::WaypointsPtr waypoints)
   for (const auto& waypoint : waypoints->waypoints) { addWaypoint(waypoint); }
 }
 
-void WaypointPublisher::clearWaypoints() 
+void WaypointPublisher::clearWaypoints()
 {
   std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
+  reset();
   m_waypoint_buffer.clear();
 }
 
-double WaypointPublisher::calc_distance(const nav_msgs::Odometry&     carrot_pose,
+bool WaypointPublisher::isFlying() const { return m_flying_to_wp; }
+
+bool WaypointPublisher::isWaiting() const { return m_is_waiting; }
+
+double WaypointPublisher::distanceToCurrentWp(const nav_msgs::Odometry& odom)
+{
+  auto optional_waypoint = getCurrentWaypoint();
+  if (!optional_waypoint.has_value() || !optional_waypoint.value()) { return -1; }
+
+  return calc_distance(odom, *optional_waypoint.value());
+}
+
+std::optional<uav_ros_msgs::WaypointPtr> WaypointPublisher::getCurrentWaypoint()
+{
+  std::optional<uav_ros_msgs::WaypointPtr> current_waypoint = std::nullopt;
+
+  {
+    std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
+
+    if (m_waypoint_buffer.empty()) { return current_waypoint; }
+
+    current_waypoint =
+      std::make_optional<uav_ros_msgs::WaypointPtr>(m_waypoint_buffer.front());
+  }
+
+  return current_waypoint;
+}
+
+double WaypointPublisher::calc_distance(const nav_msgs::Odometry&     odom,
                                         const uav_ros_msgs::Waypoint& waypoint)
 {
-  return sqrt(pow(carrot_pose.pose.pose.position.x - waypoint.pose.pose.position.x, 2)
-              + pow(carrot_pose.pose.pose.position.y - waypoint.pose.pose.position.y, 2)
-              + pow(carrot_pose.pose.pose.position.z - waypoint.pose.pose.position.z, 2));
+  return sqrt(pow(odom.pose.pose.position.x - waypoint.pose.pose.position.x, 2)
+              + pow(odom.pose.pose.position.y - waypoint.pose.pose.position.y, 2)
+              + pow(odom.pose.pose.position.z - waypoint.pose.pose.position.z, 2));
 }
