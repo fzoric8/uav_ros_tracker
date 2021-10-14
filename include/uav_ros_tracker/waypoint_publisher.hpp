@@ -18,6 +18,7 @@ public:
   void   addWaypoint(uav_ros_msgs::WaypointPtr waypoint);
   void   addWaypoint(uav_ros_msgs::Waypoint waypoint);
   void   addWaypoints(uav_ros_msgs::WaypointsPtr waypoints);
+  void   addWaypoints(const uav_ros_msgs::Waypoints& waypoints);
   void   clearWaypoints();
   bool   isFlying() const;
   bool   isWaiting() const;

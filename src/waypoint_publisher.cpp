@@ -127,6 +127,10 @@ void WaypointPublisher::addWaypoints(uav_ros_msgs::WaypointsPtr waypoints)
   for (const auto& waypoint : waypoints->waypoints) { addWaypoint(waypoint); }
 }
 
+void WaypointPublisher::addWaypoints(const uav_ros_msgs::Waypoints& waypoints) {
+  for (const auto& waypoint : waypoints.waypoints) { addWaypoint(waypoint); }
+}
+
 void WaypointPublisher::clearWaypoints()
 {
   std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);

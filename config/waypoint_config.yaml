@@ -1,0 +1,2 @@
+tracking_frame: eagle/ekf
+waypoint_frames: [eagle/carto_raw]
