@@ -1,3 +1,4 @@
+#include "geometry_msgs/PoseArray.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "ros/duration.h"
 #include "ros/publisher.h"
@@ -70,6 +71,7 @@ private:
   void       waypoint_loop(const ros::TimerEvent& /* unused */);
 
   ros::Publisher m_waypoint_status_pub;
+  ros::Publisher m_waypoint_array_pub;
 
   uav_ros_msgs::Waypoint transform_waypoint(const uav_ros_msgs::Waypoint& waypoint);
 };
@@ -170,6 +172,7 @@ void uav_ros_tracker::WaypointManager::onInit()
     nh.advertiseService("clear_waypoints", &WaypointManager::clear_waypoints_cb, this);
   m_waypoint_status_pub =
     nh.advertise<uav_ros_msgs::WaypointStatus>("waypoint_status", 1);
+  m_waypoint_array_pub = nh.advertise<geometry_msgs::PoseArray>("waypoint_array", 1);
 
   m_is_initialized = true;
   ROS_INFO("[%s] Initialized.", this->getName().c_str());
@@ -207,6 +210,11 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
 
   auto [wp_published, message, current_waypoint] =
     m_waypoint_ptr->publishWaypoint(current_odometry, tracking_enabled, control_enabled);
+
+  auto waypoint_array_msg            = m_waypoint_ptr->getWaypointArray();
+  waypoint_array_msg.header.frame_id = m_tracking_frame;
+  waypoint_array_msg.header.stamp    = ros::Time::now();
+  m_waypoint_array_pub.publish(waypoint_array_msg);
 
   // Create a status message
   uav_ros_msgs::WaypointStatus wp_status;
