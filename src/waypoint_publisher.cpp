@@ -1,3 +1,4 @@
+#include "geometry_msgs/PoseArray.h"
 #include "ros/forwards.h"
 #include <mutex>
 #include <uav_ros_tracker/waypoint_publisher.hpp>
@@ -127,6 +128,11 @@ void WaypointPublisher::addWaypoints(uav_ros_msgs::WaypointsPtr waypoints)
   for (const auto& waypoint : waypoints->waypoints) { addWaypoint(waypoint); }
 }
 
+void WaypointPublisher::addWaypoints(const uav_ros_msgs::Waypoints& waypoints)
+{
+  for (const auto& waypoint : waypoints.waypoints) { addWaypoint(waypoint); }
+}
+
 void WaypointPublisher::clearWaypoints()
 {
   std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
@@ -160,6 +166,18 @@ std::optional<uav_ros_msgs::WaypointPtr> WaypointPublisher::getCurrentWaypoint()
   }
 
   return current_waypoint;
+}
+
+geometry_msgs::PoseArray WaypointPublisher::getWaypointArray()
+{
+  std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
+  geometry_msgs::PoseArray    waypoint_array;
+
+  for (const auto& waypoint : m_waypoint_buffer) {
+    waypoint_array.poses.push_back(waypoint->pose.pose);
+  }
+
+  return waypoint_array;
 }
 
 double WaypointPublisher::calc_distance(const nav_msgs::Odometry&     odom,

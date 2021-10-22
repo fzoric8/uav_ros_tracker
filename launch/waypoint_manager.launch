@@ -1,8 +1,9 @@
 <launch>
 
-  <arg name="namespace"   default="$(env UAV_NAMESPACE)"/>
-  <arg name="pose_in"     default="tracker/input_pose"/>
-  <arg name="odometry"	  default="odometry"/>
+  <arg name="namespace"       default="$(env UAV_NAMESPACE)"/>
+  <arg name="pose_in"         default="tracker/input_pose"/>
+  <arg name="odometry"	      default="odometry"/>
+  <arg name="config"          default="$(find uav_ros_tracker)/config/waypoint_config.yaml"/>
 
   <!-- Debug arguments -->
   <arg name="debug" default="false" />
@@ -31,6 +32,8 @@
     pkg="nodelet" type="nodelet" name="waypoint_manager" 
     args="$(arg nodelet) uav_ros_tracker/WaypointManager $(arg nodelet_manager)" 
     output="screen" launch-prefix="$(arg launch_prefix)" ns="$(arg namespace)">
+
+    <rosparam file="$(arg config)" command="load"/>
 
     <remap from="pose_in"   to="$(arg pose_in)"/>
     <remap from="odometry"  to="$(arg odometry)"/>
