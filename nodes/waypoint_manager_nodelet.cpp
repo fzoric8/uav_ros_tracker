@@ -163,7 +163,8 @@ void uav_ros_tracker::WaypointManager::onInit()
     nh.subscribe("tracker/status", 1, &WaypointManager::tracker_status_cb, this);
   m_carrot_status_sub =
     nh.subscribe("carrot/status", 1, &WaypointManager::carrot_status_cb, this);
-  m_waypoint_ptr   = std::make_unique<WaypointPublisher>(nh, "pose_in");
+  m_waypoint_ptr = std::make_unique<WaypointPublisher>();
+  m_waypoint_ptr->initialize(nh, nh_private);
   m_waypoint_sub   = nh.subscribe("waypoint", 1, &WaypointManager::waypoint_cb, this);
   m_waypoints_sub  = nh.subscribe("waypoints", 1, &WaypointManager::waypoints_cb, this);
   m_odom_sub       = nh.subscribe("odometry", 1, &WaypointManager::odom_sub, this);
@@ -211,19 +212,14 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
   auto [wp_published, message, current_waypoint] =
     m_waypoint_ptr->publishWaypoint(current_odometry, tracking_enabled, control_enabled);
 
+  // Publish waypoint array
   auto waypoint_array_msg            = m_waypoint_ptr->getWaypointArray();
   waypoint_array_msg.header.frame_id = m_tracking_frame;
   waypoint_array_msg.header.stamp    = ros::Time::now();
   m_waypoint_array_pub.publish(waypoint_array_msg);
 
   // Create a status message
-  uav_ros_msgs::WaypointStatus wp_status;
-  auto                         current_wp = m_waypoint_ptr->getCurrentWaypoint();
-  wp_status.current_wp =
-    current_wp.has_value() ? *current_wp.value() : uav_ros_msgs::Waypoint{};
-  wp_status.distance_to_wp = m_waypoint_ptr->distanceToCurrentWp(current_odometry);
-  wp_status.flying_to_wp   = m_waypoint_ptr->isFlying();
-  wp_status.waiting_at_wp  = m_waypoint_ptr->isWaiting();
+  auto wp_status = m_waypoint_ptr->getWaypointStatus(current_odometry);
   m_waypoint_status_pub.publish(wp_status);
 
   // No waypoint is published
@@ -317,9 +313,9 @@ uav_ros_msgs::Waypoint uav_ros_tracker::WaypointManager::transform_waypoint(
   tf2::doTransform(waypoint.pose, transformed_pose, m_transform_map[waypoint_frame]);
 
   uav_ros_msgs::Waypoint new_wp;
-  new_wp.pose         = transformed_pose;
+  new_wp.pose                 = transformed_pose;
   new_wp.pose.pose.position.z = waypoint.pose.pose.position.z;
-  new_wp.waiting_time = waypoint.waiting_time;
+  new_wp.waiting_time         = waypoint.waiting_time;
   return new_wp;
 }
 

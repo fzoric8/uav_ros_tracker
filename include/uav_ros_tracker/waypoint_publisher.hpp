@@ -10,29 +10,26 @@
 #include <uav_ros_msgs/Waypoints.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseArray.h>
+#include <uav_ros_msgs/WaypointStatus.h>
 
 namespace uav_ros_tracker {
 class WaypointPublisher
 {
 public:
-  WaypointPublisher(ros::NodeHandle& nh, const std::string& pose_in);
-  void                     addWaypoint(uav_ros_msgs::WaypointPtr waypoint);
-  void                     addWaypoint(uav_ros_msgs::Waypoint waypoint);
-  void                     addWaypoints(uav_ros_msgs::WaypointsPtr waypoints);
-  void                     addWaypoints(const uav_ros_msgs::Waypoints& waypoints);
-  void                     clearWaypoints();
-  bool                     isFlying() const;
-  bool                     isWaiting() const;
-  geometry_msgs::PoseArray getWaypointArray();
-  double                   distanceToCurrentWp(const nav_msgs::Odometry& odom);
-
-  std::optional<uav_ros_msgs::WaypointPtr>                 getCurrentWaypoint();
+  void                         addWaypoint(const uav_ros_msgs::Waypoint& waypoint);
+  void                         addWaypoints(const uav_ros_msgs::Waypoints& waypoints);
+  void                         clearWaypoints();
+  geometry_msgs::PoseArray     getWaypointArray();
+  uav_ros_msgs::WaypointStatus getWaypointStatus(const nav_msgs::Odometry& odom);
+  void initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private);
   std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr> publishWaypoint(
     const nav_msgs::Odometry& current_odometry,
     bool                      tracking_enabled = true,
     bool                      control_enabled  = true);
 
 private:
+  std::optional<uav_ros_msgs::WaypointPtr> getCurrentWaypoint();
+  double                distanceToCurrentWp(const nav_msgs::Odometry& odom);
   static constexpr auto WAYPOINT_RATE = 10;
   static constexpr auto THROTTLE_TIME = 5;
   static constexpr auto DISTANCE_TOL  = 0.3;
