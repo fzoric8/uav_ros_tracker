@@ -24,7 +24,7 @@ public:
   geometry_msgs::PoseArray     getWaypointArray() override;
   uav_ros_msgs::WaypointStatus getWaypointStatus(const nav_msgs::Odometry& odom) override;
 
-  void initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private) override;
+  bool initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private) override;
   std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr> publishWaypoint(
     const nav_msgs::Odometry& current_odometry,
     bool                      tracking_enabled = true,

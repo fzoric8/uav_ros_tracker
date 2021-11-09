@@ -36,6 +36,7 @@
   <export>
     <!-- Other tools can request additional information be placed here -->
     <nodelet plugin="${prefix}/nodelets.xml" />
+    <uav_ros_tracker plugin="${prefix}/plugins.xml"/>
 
   </export>
 </package>

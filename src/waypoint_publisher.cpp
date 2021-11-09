@@ -5,10 +5,11 @@
 
 using namespace uav_ros_tracker;
 
-void WaypointPublisher::initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private)
+bool WaypointPublisher::initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private)
 {
-  m_nh = nh;
+  m_nh               = nh;
   m_tracker_pose_pub = m_nh.advertise<geometry_msgs::PoseStamped>("pose_in", 1);
+  return true;
 }
 
 void WaypointPublisher::reset()
@@ -179,3 +180,7 @@ double WaypointPublisher::calc_distance(const nav_msgs::Odometry&     odom,
               + pow(odom.pose.pose.position.y - waypoint.pose.pose.position.y, 2)
               + pow(odom.pose.pose.position.z - waypoint.pose.pose.position.z, 2));
 }
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(uav_ros_tracker::WaypointPublisher,
+                       uav_ros_tracker::planner_interface);

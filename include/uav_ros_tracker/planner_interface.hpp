@@ -59,7 +59,7 @@ public:
    * @param nh
    * @param nh_private
    */
-  virtual void initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private) = 0;
+  virtual bool initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private) = 0;
 
   /**
    * @brief Check if a new waypoint should be published
