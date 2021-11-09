@@ -11,21 +11,24 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseArray.h>
 #include <uav_ros_msgs/WaypointStatus.h>
+#include <uav_ros_tracker/planner_interface.hpp>
 
 namespace uav_ros_tracker {
-class WaypointPublisher
+class WaypointPublisher : public planner_interface
 {
 public:
-  void                         addWaypoint(const uav_ros_msgs::Waypoint& waypoint);
-  void                         addWaypoints(const uav_ros_msgs::Waypoints& waypoints);
-  void                         clearWaypoints();
-  geometry_msgs::PoseArray     getWaypointArray();
-  uav_ros_msgs::WaypointStatus getWaypointStatus(const nav_msgs::Odometry& odom);
-  void initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private);
+  void addWaypoint(const uav_ros_msgs::Waypoint& waypoint) override;
+  void addWaypoints(const uav_ros_msgs::Waypoints& waypoints) override;
+  void clearWaypoints() override;
+
+  geometry_msgs::PoseArray     getWaypointArray() override;
+  uav_ros_msgs::WaypointStatus getWaypointStatus(const nav_msgs::Odometry& odom) override;
+
+  void initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private) override;
   std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr> publishWaypoint(
     const nav_msgs::Odometry& current_odometry,
     bool                      tracking_enabled = true,
-    bool                      control_enabled  = true);
+    bool                      control_enabled  = true) override;
 
 private:
   std::optional<uav_ros_msgs::WaypointPtr> getCurrentWaypoint();
