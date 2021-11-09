@@ -5,10 +5,11 @@
 
 using namespace uav_ros_tracker;
 
-WaypointPublisher::WaypointPublisher(ros::NodeHandle& nh, const std::string& pose_in)
-  : m_nh(nh)
+bool WaypointPublisher::initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private)
 {
-  m_tracker_pose_pub = m_nh.advertise<geometry_msgs::PoseStamped>(pose_in, 1);
+  m_nh               = nh;
+  m_tracker_pose_pub = m_nh.advertise<geometry_msgs::PoseStamped>("pose_in", 1);
+  return true;
 }
 
 void WaypointPublisher::reset()
@@ -98,19 +99,20 @@ std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr>
   return std::make_tuple(true, "Hello From publish_waypoint", current_waypoint_ptr);
 }
 
-void WaypointPublisher::addWaypoint(uav_ros_msgs::WaypointPtr waypoint)
+uav_ros_msgs::WaypointStatus WaypointPublisher::getWaypointStatus(
+  const nav_msgs::Odometry& odom)
 {
-  std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
-  m_waypoint_buffer.emplace_back(waypoint);
-
-  ROS_INFO("[%s] Waypoint Added [%.2f, %.2f, %.2f]",
-           NAME,
-           waypoint->pose.pose.position.x,
-           waypoint->pose.pose.position.y,
-           waypoint->pose.pose.position.z);
+  uav_ros_msgs::WaypointStatus wp_status;
+  auto                         current_wp = getCurrentWaypoint();
+  wp_status.current_wp =
+    current_wp.has_value() ? *current_wp.value() : uav_ros_msgs::Waypoint{};
+  wp_status.distance_to_wp = distanceToCurrentWp(odom);
+  wp_status.flying_to_wp   = m_flying_to_wp;
+  wp_status.waiting_at_wp  = m_is_waiting;
+  return wp_status;
 }
 
-void WaypointPublisher::addWaypoint(uav_ros_msgs::Waypoint waypoint)
+void WaypointPublisher::addWaypoint(const uav_ros_msgs::Waypoint& waypoint)
 {
   std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
   m_waypoint_buffer.emplace_back(
@@ -121,11 +123,6 @@ void WaypointPublisher::addWaypoint(uav_ros_msgs::Waypoint waypoint)
            waypoint.pose.pose.position.x,
            waypoint.pose.pose.position.y,
            waypoint.pose.pose.position.z);
-}
-
-void WaypointPublisher::addWaypoints(uav_ros_msgs::WaypointsPtr waypoints)
-{
-  for (const auto& waypoint : waypoints->waypoints) { addWaypoint(waypoint); }
 }
 
 void WaypointPublisher::addWaypoints(const uav_ros_msgs::Waypoints& waypoints)
@@ -139,10 +136,6 @@ void WaypointPublisher::clearWaypoints()
   reset();
   m_waypoint_buffer.clear();
 }
-
-bool WaypointPublisher::isFlying() const { return m_flying_to_wp; }
-
-bool WaypointPublisher::isWaiting() const { return m_is_waiting; }
 
 double WaypointPublisher::distanceToCurrentWp(const nav_msgs::Odometry& odom)
 {
@@ -187,3 +180,7 @@ double WaypointPublisher::calc_distance(const nav_msgs::Odometry&     odom,
               + pow(odom.pose.pose.position.y - waypoint.pose.pose.position.y, 2)
               + pow(odom.pose.pose.position.z - waypoint.pose.pose.position.z, 2));
 }
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(uav_ros_tracker::WaypointPublisher,
+                       uav_ros_tracker::planner_interface);

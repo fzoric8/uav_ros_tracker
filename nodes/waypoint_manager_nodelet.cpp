@@ -1,7 +1,9 @@
 #include "geometry_msgs/PoseArray.h"
 #include "geometry_msgs/PoseStamped.h"
+#include <std_msgs/String.h>
 #include "ros/duration.h"
 #include "ros/publisher.h"
+#include <pluginlib/class_loader.h>
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Vector3.h"
 #include "tf2/buffer_core.h"
@@ -11,7 +13,7 @@
 #include "tf2_ros/buffer.h"
 #include "uav_ros_msgs/Waypoint.h"
 #include <mutex>
-#include <uav_ros_tracker/waypoint_publisher.hpp>
+#include <uav_ros_tracker/planner_interface.hpp>
 #include <nodelet/nodelet.h>
 #include <std_srvs/SetBool.h>
 #include <uav_ros_msgs/WaypointStatus.h>
@@ -22,6 +24,8 @@
 #include <uav_ros_lib/ros_convert.hpp>
 #include <geometry_msgs/TransformStamped.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
+using planner_loader_t = pluginlib::ClassLoader<uav_ros_tracker::planner_interface>;
 
 namespace uav_ros_tracker {
 class WaypointManager : public nodelet::Nodelet
@@ -35,11 +39,16 @@ private:
   static constexpr auto HOLD           = "HOLD";
   static constexpr auto THROTTLE_S     = 5;
 
-  bool                               m_is_initialized = false;
-  std::unique_ptr<WaypointPublisher> m_waypoint_ptr;
-  std::string                        m_tracking_frame;
-  std::vector<std::string>           m_waypoint_frames;
+  // Planner plugin
+  std::unique_ptr<planner_loader_t>                     m_planner_loader_ptr;
+  boost::shared_ptr<uav_ros_tracker::planner_interface> m_planner_ptr;
+
+  bool                     m_is_initialized = false;
+  std::string              m_tracking_frame;
+  std::vector<std::string> m_waypoint_frames;
+
   std::unordered_map<std::string, geometry_msgs::TransformStamped> m_transform_map;
+  void initialize_transform_map();
 
   ros::Subscriber m_waypoint_sub;
   void            waypoint_cb(uav_ros_msgs::WaypointPtr msg);
@@ -85,6 +94,44 @@ void uav_ros_tracker::WaypointManager::onInit()
   param_util::getParamOrThrow(nh_private, "tracking_frame", m_tracking_frame);
   param_util::getParamOrThrow(nh_private, "waypoint_frames", m_waypoint_frames);
 
+  initialize_transform_map();
+
+  // Get the planner name
+  std::string planner_name;
+  param_util::getParamOrThrow(nh_private, "planner_name", planner_name);
+
+  // Load planner plugin
+  m_planner_loader_ptr = std::make_unique<planner_loader_t>(
+    "uav_ros_tracker", "uav_ros_tracker::planner_interface");
+  m_planner_ptr = m_planner_loader_ptr->createUniqueInstance(planner_name);
+
+  // Initialize the planner
+  auto init_success = m_planner_ptr->initialize(nh, nh_private);
+  if (!init_success) {
+    ROS_ERROR("[WaypointManager] planner initialization unsucessful!");
+    ros::shutdown();
+  }
+
+  m_tracker_status_sub =
+    nh.subscribe("tracker/status", 1, &WaypointManager::tracker_status_cb, this);
+  m_carrot_status_sub =
+    nh.subscribe("carrot/status", 1, &WaypointManager::carrot_status_cb, this);
+  m_waypoint_sub   = nh.subscribe("waypoint", 1, &WaypointManager::waypoint_cb, this);
+  m_waypoints_sub  = nh.subscribe("waypoints", 1, &WaypointManager::waypoints_cb, this);
+  m_odom_sub       = nh.subscribe("odometry", 1, &WaypointManager::odom_sub, this);
+  m_waypoint_timer = nh.createTimer(ros::Rate(50), &WaypointManager::waypoint_loop, this);
+  m_clear_waypoints_srv =
+    nh.advertiseService("clear_waypoints", &WaypointManager::clear_waypoints_cb, this);
+  m_waypoint_status_pub =
+    nh.advertise<uav_ros_msgs::WaypointStatus>("waypoint_status", 1);
+  m_waypoint_array_pub = nh.advertise<geometry_msgs::PoseArray>("waypoint_array", 1);
+
+  m_is_initialized = true;
+  ROS_INFO("[%s] Initialized.", this->getName().c_str());
+}
+
+void uav_ros_tracker::WaypointManager::initialize_transform_map()
+{
   // Initialize transform helpers
   tf2_ros::Buffer            buffer;
   tf2_ros::TransformListener transform_listener{ buffer };
@@ -158,24 +205,6 @@ void uav_ros_tracker::WaypointManager::onInit()
 
   ROS_INFO_STREAM(getName() << "Translation for frame " << m_tracking_frame
                             << " is: " << m_transform_map[m_tracking_frame]);
-
-  m_tracker_status_sub =
-    nh.subscribe("tracker/status", 1, &WaypointManager::tracker_status_cb, this);
-  m_carrot_status_sub =
-    nh.subscribe("carrot/status", 1, &WaypointManager::carrot_status_cb, this);
-  m_waypoint_ptr   = std::make_unique<WaypointPublisher>(nh, "pose_in");
-  m_waypoint_sub   = nh.subscribe("waypoint", 1, &WaypointManager::waypoint_cb, this);
-  m_waypoints_sub  = nh.subscribe("waypoints", 1, &WaypointManager::waypoints_cb, this);
-  m_odom_sub       = nh.subscribe("odometry", 1, &WaypointManager::odom_sub, this);
-  m_waypoint_timer = nh.createTimer(ros::Rate(50), &WaypointManager::waypoint_loop, this);
-  m_clear_waypoints_srv =
-    nh.advertiseService("clear_waypoints", &WaypointManager::clear_waypoints_cb, this);
-  m_waypoint_status_pub =
-    nh.advertise<uav_ros_msgs::WaypointStatus>("waypoint_status", 1);
-  m_waypoint_array_pub = nh.advertise<geometry_msgs::PoseArray>("waypoint_array", 1);
-
-  m_is_initialized = true;
-  ROS_INFO("[%s] Initialized.", this->getName().c_str());
 }
 
 void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* unused */)
@@ -209,21 +238,16 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
   }
 
   auto [wp_published, message, current_waypoint] =
-    m_waypoint_ptr->publishWaypoint(current_odometry, tracking_enabled, control_enabled);
+    m_planner_ptr->publishWaypoint(current_odometry, tracking_enabled, control_enabled);
 
-  auto waypoint_array_msg            = m_waypoint_ptr->getWaypointArray();
+  // Publish waypoint array
+  auto waypoint_array_msg            = m_planner_ptr->getWaypointArray();
   waypoint_array_msg.header.frame_id = m_tracking_frame;
   waypoint_array_msg.header.stamp    = ros::Time::now();
   m_waypoint_array_pub.publish(waypoint_array_msg);
 
   // Create a status message
-  uav_ros_msgs::WaypointStatus wp_status;
-  auto                         current_wp = m_waypoint_ptr->getCurrentWaypoint();
-  wp_status.current_wp =
-    current_wp.has_value() ? *current_wp.value() : uav_ros_msgs::Waypoint{};
-  wp_status.distance_to_wp = m_waypoint_ptr->distanceToCurrentWp(current_odometry);
-  wp_status.flying_to_wp   = m_waypoint_ptr->isFlying();
-  wp_status.waiting_at_wp  = m_waypoint_ptr->isWaiting();
+  auto wp_status = m_planner_ptr->getWaypointStatus(current_odometry);
   m_waypoint_status_pub.publish(wp_status);
 
   // No waypoint is published
@@ -254,7 +278,7 @@ void uav_ros_tracker::WaypointManager::waypoint_cb(const uav_ros_msgs::WaypointP
     return;
   }
   auto transformed_wp = transform_waypoint(*msg);
-  m_waypoint_ptr->addWaypoint(transformed_wp);
+  m_planner_ptr->addWaypoint(transformed_wp);
 }
 
 void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::WaypointsPtr msg)
@@ -268,7 +292,7 @@ void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::Waypoint
   for (const auto& wp : msg->waypoints) {
     transformed_wps.waypoints.push_back(transform_waypoint(wp));
   }
-  m_waypoint_ptr->addWaypoints(transformed_wps);
+  m_planner_ptr->addWaypoints(transformed_wps);
 }
 
 void uav_ros_tracker::WaypointManager::tracker_status_cb(
@@ -295,7 +319,7 @@ bool uav_ros_tracker::WaypointManager::clear_waypoints_cb(
     return true;
   }
 
-  m_waypoint_ptr->clearWaypoints();
+  m_planner_ptr->clearWaypoints();
   resp.success = true;
   resp.message = "Waypoints successfully cleared";
   return true;
@@ -317,9 +341,9 @@ uav_ros_msgs::Waypoint uav_ros_tracker::WaypointManager::transform_waypoint(
   tf2::doTransform(waypoint.pose, transformed_pose, m_transform_map[waypoint_frame]);
 
   uav_ros_msgs::Waypoint new_wp;
-  new_wp.pose         = transformed_pose;
+  new_wp.pose                 = transformed_pose;
   new_wp.pose.pose.position.z = waypoint.pose.pose.position.z;
-  new_wp.waiting_time = waypoint.waiting_time;
+  new_wp.waiting_time         = waypoint.waiting_time;
   return new_wp;
 }
 

@@ -1,0 +1,6 @@
+
+<library path="lib/libwaypoint_publisher">
+  <class name="WaypointPublisher" type="uav_ros_tracker::WaypointPublisher" base_class_type="uav_ros_tracker::planner_interface">
+    <description>A WaypointPublisher plugin.</description>
+  </class>
+</library>

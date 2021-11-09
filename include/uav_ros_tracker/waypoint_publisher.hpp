@@ -10,29 +10,29 @@
 #include <uav_ros_msgs/Waypoints.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseArray.h>
+#include <uav_ros_msgs/WaypointStatus.h>
+#include <uav_ros_tracker/planner_interface.hpp>
 
 namespace uav_ros_tracker {
-class WaypointPublisher
+class WaypointPublisher : public planner_interface
 {
 public:
-  WaypointPublisher(ros::NodeHandle& nh, const std::string& pose_in);
-  void                     addWaypoint(uav_ros_msgs::WaypointPtr waypoint);
-  void                     addWaypoint(uav_ros_msgs::Waypoint waypoint);
-  void                     addWaypoints(uav_ros_msgs::WaypointsPtr waypoints);
-  void                     addWaypoints(const uav_ros_msgs::Waypoints& waypoints);
-  void                     clearWaypoints();
-  bool                     isFlying() const;
-  bool                     isWaiting() const;
-  geometry_msgs::PoseArray getWaypointArray();
-  double                   distanceToCurrentWp(const nav_msgs::Odometry& odom);
+  void addWaypoint(const uav_ros_msgs::Waypoint& waypoint) override;
+  void addWaypoints(const uav_ros_msgs::Waypoints& waypoints) override;
+  void clearWaypoints() override;
 
-  std::optional<uav_ros_msgs::WaypointPtr>                 getCurrentWaypoint();
+  geometry_msgs::PoseArray     getWaypointArray() override;
+  uav_ros_msgs::WaypointStatus getWaypointStatus(const nav_msgs::Odometry& odom) override;
+
+  bool initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private) override;
   std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr> publishWaypoint(
     const nav_msgs::Odometry& current_odometry,
     bool                      tracking_enabled = true,
-    bool                      control_enabled  = true);
+    bool                      control_enabled  = true) override;
 
 private:
+  std::optional<uav_ros_msgs::WaypointPtr> getCurrentWaypoint();
+  double                distanceToCurrentWp(const nav_msgs::Odometry& odom);
   static constexpr auto WAYPOINT_RATE = 10;
   static constexpr auto THROTTLE_TIME = 5;
   static constexpr auto DISTANCE_TOL  = 0.3;
