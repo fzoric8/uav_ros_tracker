@@ -1,0 +1,40 @@
+name: wp_dry
+root: ./
+startup_window: roscore
+pre_window: export UAV_NAMESPACE=red
+windows:
+  - roscore:
+      layout: tiled
+      panes:
+        - roscore
+        - waitForRos; roslaunch uav_ros_tracker waypoint_manager.launch
+        - waitForRos; inspection_ws; roscd uav_ros_indoor; cd startup/danieli_hawk_sensor_fusion/waypoints
+  - setup:
+      layout: tiled
+      panes:
+        - waitForRos; sleep 2; rosbag play /home/lmark/Bags/danieli1_compassless/tf.bag
+        - waitForRos; rostopic pub --latch /$UAV_NAMESPACE/carrot/status std_msgs/String \"HOLD\"
+        - waitForRos; rostopic pub --latch /$UAV_NAMESPACE/tracker/status std_msgs/String \"ACCEPT\"
+        - |
+          waitForRos;
+          rostopic pub --latch /$UAV_NAMESPACE/odometry nav_msgs/Odometry "header:
+            seq: 0
+            stamp:
+              secs: 0
+              nsecs: 0
+            frame_id: ''
+          child_frame_id: ''
+          pose:
+            pose:
+              position: {x: 0.0, y: 0.0, z: 0.0}
+              orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.0}
+            covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+              0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+          twist:
+            twist:
+              linear: {x: 0.0, y: 0.0, z: 0.0}
+              angular: {x: 0.0, y: 0.0, z: 0.0}
+            covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+              0.0, 0.0, 0.0, 0.0, 0.0, 0.0]"
