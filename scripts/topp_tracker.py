@@ -248,7 +248,15 @@ class ToppTracker:
         joint_trajectory = response.trajectory
 
         self.enable_trajectory = False
-        self.trajectory = self.JointTrajectory2MultiDofTrajectory(joint_trajectory)
+
+        # Take the first point in the message, extract its roll / pitch and copy it in the 
+        # final trajectory
+        angles = tf.transformations.euler_from_quaternion([
+            msg.points[0].transforms[0].rotation.x, 
+            msg.points[0].transforms[0].rotation.y,
+            msg.points[0].transforms[0].rotation.z,
+            msg.points[0].transforms[0].rotation.w])
+        self.trajectory = self.JointTrajectory2MultiDofTrajectory(joint_trajectory, angles[0], angles[1])
 
         # Publish the path
         path_msg = Path()
@@ -269,7 +277,7 @@ class ToppTracker:
         self.path_pub.publish(path_msg)
         
 
-    def JointTrajectory2MultiDofTrajectory(self, joint_trajectory):
+    def JointTrajectory2MultiDofTrajectory(self, joint_trajectory, roll = 0, pitch = 0):
         multi_dof_trajectory = MultiDOFJointTrajectory()
 
         for i in range(0, len(joint_trajectory.points)):
@@ -279,7 +287,7 @@ class ToppTracker:
             temp_transform.translation.y = joint_trajectory.points[i].positions[1]
             temp_transform.translation.z = joint_trajectory.points[i].positions[2]
 
-            quaternion = tf.transformations.quaternion_from_euler(0, 0, joint_trajectory.points[i].positions[3])
+            quaternion = tf.transformations.quaternion_from_euler(roll, pitch, joint_trajectory.points[i].positions[3])
             temp_transform.rotation.x = quaternion[0]
             temp_transform.rotation.y = quaternion[1]
             temp_transform.rotation.z = quaternion[2]
