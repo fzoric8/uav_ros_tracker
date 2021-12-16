@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import math
 import rospy
 import tf
 import copy
@@ -106,7 +107,6 @@ class ToppTracker:
             
         return resp
         
-
     def fix_topp_yaw(self, curr_yaw, previous_yaw):
         delta = previous_yaw - curr_yaw
         if delta > pi:
@@ -114,15 +114,13 @@ class ToppTracker:
         elif delta < -pi:
             return curr_yaw - ceil(floor(abs(delta)/pi)/2.0) * 2 * pi
         return curr_yaw
-            
+
     def interpolate_points(self, start_p, end_p, res=1.0):
         print("Interpolating points")
         x = []
         y = []
         z = []
         yaw = []
-        print("End: ", end_p.transforms[0].translation)
-        print("Start: ", start_p.transforms[0].translation)
         distance = sqrt((end_p.transforms[0].translation.x - start_p.transforms[0].translation.x) ** 2 + 
             (end_p.transforms[0].translation.y - start_p.transforms[0].translation.y) ** 2 + 
             (end_p.transforms[0].translation.z - start_p.transforms[0].translation.z) ** 2)
@@ -139,6 +137,11 @@ class ToppTracker:
                 end_p.transforms[0].rotation.y,
                 end_p.transforms[0].rotation.z,
                 end_p.transforms[0].rotation.w])[2]
+        # Unwrap end yaw to interpolate correctly
+        end_yaw = self.fix_topp_yaw(end_yaw, start_yaw)
+
+        print("End: ", end_p.transforms[0].translation, end_yaw)
+        print("Start: ", start_p.transforms[0].translation, start_yaw)
         for delta in increments:
             x.append((1 - delta) * start_p.transforms[0].translation.x + delta * end_p.transforms[0].translation.x)
             y.append((1 - delta) * start_p.transforms[0].translation.y + delta * end_p.transforms[0].translation.y)
@@ -146,7 +149,9 @@ class ToppTracker:
             yaw.append((1 - delta) * start_yaw + delta * end_yaw)
 
             if len(yaw) > 1:
+                print("fixing yaw: ", yaw[-1], yaw[-2])
                 yaw[-1] = self.fix_topp_yaw(yaw[-1], yaw[-2])
+                print("fixed yaw: ", yaw[-1])
             
         return x, y, z, yaw
 
@@ -210,7 +215,10 @@ class ToppTracker:
 
             # Fix Toppra orientation, at this point atleast two points are in trajectory
             if len(yaw) > 1:           
+                print("fixing yaw: ", yaw[-1], yaw[-2])
                 yaw[-1] = self.fix_topp_yaw(yaw[-1], yaw[-2])
+                print("fixed yaw: ", yaw[-1])
+                
         
         for x_,y_,z_,yaw_ in zip(x, y, z, yaw):
             print("Recieved point: ", x_, y_, z_, yaw_)
