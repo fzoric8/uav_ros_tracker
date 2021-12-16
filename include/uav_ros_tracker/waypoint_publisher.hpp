@@ -24,7 +24,12 @@ public:
   geometry_msgs::PoseArray     getWaypointArray() override;
   uav_ros_msgs::WaypointStatus getWaypointStatus(const nav_msgs::Odometry& odom) override;
 
-  bool initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private) override;
+  bool initialize(
+    ros::NodeHandle&                                                 nh,
+    ros::NodeHandle&                                                 nh_private,
+    std::unordered_map<std::string, geometry_msgs::TransformStamped> transform_map,
+    std::string tracking_frame) override;
+
   std::tuple<bool, std::string, uav_ros_msgs::WaypointPtr> publishWaypoint(
     const nav_msgs::Odometry& current_odometry,
     bool                      tracking_enabled = true,
@@ -42,11 +47,11 @@ private:
   bool            m_flying_to_wp = false;
 
   void   reset();
-  double calc_distance(const nav_msgs::Odometry&     odometry,
-                       const uav_ros_msgs::Waypoint& waypoint);
 
-  ros::Timer m_waiting_timer;
-  bool       m_is_waiting = false;
+  ros::Timer                                                       m_waiting_timer;
+  bool                                                             m_is_waiting = false;
+  std::string                                                      m_tracking_frame;
+  std::unordered_map<std::string, geometry_msgs::TransformStamped> m_transform_map;
 
   ros::Publisher                        m_tracker_pose_pub;
   std::mutex                            m_waypoint_buffer_mutex;

@@ -7,6 +7,9 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseArray.h>
 #include <uav_ros_msgs/WaypointStatus.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <unordered_map>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 namespace uav_ros_tracker {
 
@@ -59,7 +62,11 @@ public:
    * @param nh
    * @param nh_private
    */
-  virtual bool initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private) = 0;
+  virtual bool initialize(
+    ros::NodeHandle&                                                 nh,
+    ros::NodeHandle&                                                 nh_private,
+    std::unordered_map<std::string, geometry_msgs::TransformStamped> transform_map,
+    std::string                                                      tracking_frame) = 0;
 
   /**
    * @brief Check if a new waypoint should be published
@@ -76,6 +83,43 @@ public:
     const nav_msgs::Odometry& current_odometry,
     bool                      tracking_enabled = true,
     bool                      control_enabled  = true) = 0;
+
+  /**
+   * @brief Transform the given waypoint using the transform map
+   *
+   * @param waypoint
+   * @return uav_ros_msgs::Waypoint
+   */
+  static uav_ros_msgs::Waypoint transform_waypoint(
+    const uav_ros_msgs::Waypoint&                                           waypoint,
+    const std::unordered_map<std::string, geometry_msgs::TransformStamped>& transform_map,
+    const std::string& tracking_frame)
+  {
+    auto waypoint_frame = waypoint.pose.header.frame_id;
+    if (transform_map.find(waypoint_frame) == transform_map.end()) {
+      ROS_WARN("[PlannerInterface] Waypoint frame %s unrecognized, setting to %s.",
+               waypoint_frame.c_str(),
+               tracking_frame.c_str());
+      waypoint_frame = tracking_frame;
+    }
+
+    geometry_msgs::PoseStamped transformed_pose;
+    tf2::doTransform(waypoint.pose, transformed_pose, transform_map.at(waypoint_frame));
+
+    uav_ros_msgs::Waypoint new_wp;
+    new_wp.pose                 = transformed_pose;
+    new_wp.pose.pose.position.z = waypoint.pose.pose.position.z;
+    new_wp.waiting_time         = waypoint.waiting_time;
+    return new_wp;
+  }
+
+  static double calc_distance(const nav_msgs::Odometry&     odom,
+                              const uav_ros_msgs::Waypoint& waypoint)
+  {
+    return sqrt(pow(odom.pose.pose.position.x - waypoint.pose.pose.position.x, 2)
+                + pow(odom.pose.pose.position.y - waypoint.pose.pose.position.y, 2)
+                + pow(odom.pose.pose.position.z - waypoint.pose.pose.position.z, 2));
+  }
 
 protected:
   planner_interface() { ROS_INFO("[planner_interface] Constructor"); }

@@ -23,7 +23,6 @@
 #include <uav_ros_lib/param_util.hpp>
 #include <uav_ros_lib/ros_convert.hpp>
 #include <geometry_msgs/TransformStamped.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 using planner_loader_t = pluginlib::ClassLoader<uav_ros_tracker::planner_interface>;
 
@@ -81,8 +80,6 @@ private:
 
   ros::Publisher m_waypoint_status_pub;
   ros::Publisher m_waypoint_array_pub;
-
-  uav_ros_msgs::Waypoint transform_waypoint(const uav_ros_msgs::Waypoint& waypoint);
 };
 }// namespace uav_ros_tracker
 
@@ -105,8 +102,14 @@ void uav_ros_tracker::WaypointManager::onInit()
     "uav_ros_tracker", "uav_ros_tracker::planner_interface");
   m_planner_ptr = m_planner_loader_ptr->createUniqueInstance(planner_name);
 
+  if (m_planner_ptr == nullptr) {
+    ROS_ERROR("[WaypointManager] Unable to load plugin %s", planner_name.c_str());
+    ros::shutdown();
+  }
+
   // Initialize the planner
-  auto init_success = m_planner_ptr->initialize(nh, nh_private);
+  auto init_success =
+    m_planner_ptr->initialize(nh, nh_private, m_transform_map, m_tracking_frame);
   if (!init_success) {
     ROS_ERROR("[WaypointManager] planner initialization unsucessful!");
     ros::shutdown();
@@ -277,8 +280,7 @@ void uav_ros_tracker::WaypointManager::waypoint_cb(const uav_ros_msgs::WaypointP
     ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Nodelet not initialized.", getName().c_str());
     return;
   }
-  auto transformed_wp = transform_waypoint(*msg);
-  m_planner_ptr->addWaypoint(transformed_wp);
+  m_planner_ptr->addWaypoint(*msg);
 }
 
 void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::WaypointsPtr msg)
@@ -287,12 +289,7 @@ void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::Waypoint
     ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Nodelet not initialized.", getName().c_str());
     return;
   }
-
-  uav_ros_msgs::Waypoints transformed_wps;
-  for (const auto& wp : msg->waypoints) {
-    transformed_wps.waypoints.push_back(transform_waypoint(wp));
-  }
-  m_planner_ptr->addWaypoints(transformed_wps);
+  m_planner_ptr->addWaypoints(*msg);
 }
 
 void uav_ros_tracker::WaypointManager::tracker_status_cb(
@@ -323,28 +320,6 @@ bool uav_ros_tracker::WaypointManager::clear_waypoints_cb(
   resp.success = true;
   resp.message = "Waypoints successfully cleared";
   return true;
-}
-
-uav_ros_msgs::Waypoint uav_ros_tracker::WaypointManager::transform_waypoint(
-  const uav_ros_msgs::Waypoint& waypoint)
-{
-  auto waypoint_frame = waypoint.pose.header.frame_id;
-  if (m_transform_map.find(waypoint_frame) == m_transform_map.end()) {
-    ROS_WARN("[%s] Waypoint frame %s unrecognized, setting to %s.",
-             getName().c_str(),
-             waypoint_frame.c_str(),
-             m_tracking_frame.c_str());
-    waypoint_frame = m_tracking_frame;
-  }
-
-  geometry_msgs::PoseStamped transformed_pose;
-  tf2::doTransform(waypoint.pose, transformed_pose, m_transform_map[waypoint_frame]);
-
-  uav_ros_msgs::Waypoint new_wp;
-  new_wp.pose                 = transformed_pose;
-  new_wp.pose.pose.position.z = waypoint.pose.pose.position.z;
-  new_wp.waiting_time         = waypoint.waiting_time;
-  return new_wp;
 }
 
 #include <pluginlib/class_list_macros.h>
