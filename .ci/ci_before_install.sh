@@ -23,7 +23,7 @@ cd uav_ros_stack
 echo "running the main install.sh"
 ./installation/install.sh
 
-gitman update
+gitman update --force
 
 # checkout the SHA
 cd ~/uav_ros_stack/.gitman/$PACKAGE_NAME
