@@ -179,6 +179,12 @@ geometry_msgs::PoseArray WaypointPublisher::getWaypointArray()
   return waypoint_array;
 }
 
+void WaypointPublisher::updateTransformMap(
+  std::unordered_map<std::string, geometry_msgs::TransformStamped> transform_map)
+{
+  // TODO: Provide implementation
+}
+
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(uav_ros_tracker::WaypointPublisher,
                        uav_ros_tracker::planner_interface);

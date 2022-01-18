@@ -23,6 +23,8 @@ public:
 
   geometry_msgs::PoseArray     getWaypointArray() override;
   uav_ros_msgs::WaypointStatus getWaypointStatus(const nav_msgs::Odometry& odom) override;
+  void updateTransformMap(std::unordered_map<std::string, geometry_msgs::TransformStamped>
+                            transform_map) override;
 
   bool initialize(
     ros::NodeHandle&                                                 nh,
@@ -46,7 +48,7 @@ private:
   ros::NodeHandle m_nh;
   bool            m_flying_to_wp = false;
 
-  void   reset();
+  void reset();
 
   ros::Timer                                                       m_waiting_timer;
   bool                                                             m_is_waiting = false;

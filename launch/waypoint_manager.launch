@@ -5,6 +5,7 @@
   <arg name="odometry"	      default="odometry"/>
   <arg name="config"          default="$(find uav_ros_tracker)/config/waypoint_config.yaml"/>
   <arg name="planner_name"    default="WaypointPublisher"/>
+  <arg name="planner_config"  default="$(find uav_ros_tracker)/config/planner_config.yaml" />
 
   <!-- Debug arguments -->
   <arg name="debug" default="false" />
@@ -34,7 +35,9 @@
     args="$(arg nodelet) uav_ros_tracker/WaypointManager $(arg nodelet_manager)" 
     output="screen" launch-prefix="$(arg launch_prefix)" ns="$(arg namespace)">
 
-    <rosparam file="$(arg config)" command="load"/>
+    <rosparam file="$(arg config)"          command="load"/>
+    <rosparam file="$(arg planner_config)"  command="load"/>
+
     <param name="planner_name"  value="$(arg planner_name)"/>
     
     <remap from="pose_in"       to="$(arg pose_in)"/>

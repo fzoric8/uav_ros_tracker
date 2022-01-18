@@ -69,6 +69,14 @@ public:
     std::string                                                      tracking_frame) = 0;
 
   /**
+   * @brief Update the transform map used for transforming waypoints.
+   * 
+   * @param transform_map 
+   */
+  virtual void updateTransformMap(
+    std::unordered_map<std::string, geometry_msgs::TransformStamped> transform_map) = 0;
+
+  /**
    * @brief Check if a new waypoint should be published
    *
    * @param current_odometry
