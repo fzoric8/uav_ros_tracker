@@ -11,7 +11,7 @@ from std_msgs.msg import Bool
 from topp_ros.srv import GenerateTrajectory, GenerateTrajectoryRequest
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint, \
     MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
-from geometry_msgs.msg import Transform, Twist, PoseStamped
+from geometry_msgs.msg import Transform, Twist, PoseStamped, PoseArray
 from nav_msgs.msg import Path
 from std_srvs.srv import Empty, SetBool
 from std_srvs.srv import EmptyResponse, SetBoolResponse
@@ -56,6 +56,8 @@ class ToppTracker:
 
         self.point_index = 0
         self.trajectory = MultiDOFJointTrajectory()
+        self.trajectory_pose_arr = PoseArray()
+        self.trajectory_index = 0
         self.traj_sub = rospy.Subscriber("tracker/input_trajectory", MultiDOFJointTrajectory, self.trajectory_cb)
         self.pose_sub = rospy.Subscriber("tracker/input_pose", PoseStamped, self.pose_cb)
 
@@ -70,6 +72,7 @@ class ToppTracker:
         self.point_pub = rospy.Publisher("output/point", MultiDOFJointTrajectoryPoint, queue_size=1)
         self.activity_pub = rospy.Publisher("tracker/status", String, queue_size=1)
         self.path_pub = rospy.Publisher("tracker/path", Path, queue_size=1)
+        self.trajectory_pose_arr_pub = rospy.Publisher("tracker/remaining_trajectory", PoseArray, queue_size=1)
 
         self.enable_trajectory = False
         self.enable_service = rospy.Service("tracker/enable", SetBool, self.enable_service_cb)
@@ -85,6 +88,8 @@ class ToppTracker:
         if not self.carrot_status.data == "HOLD" and self.trajectory.points:
             print("ToppTracker - hold disabled, clearing trajectory!")
             self.trajectory.points = []
+            self.trajectory_pose_arr.poses = []
+            self.trajectory_index = 0
 
     def carrot_trajectory_cb(self, msg):
         self.carrot_trajectory = msg
@@ -149,10 +154,8 @@ class ToppTracker:
             yaw.append((1 - delta) * start_yaw + delta * end_yaw)
 
             if len(yaw) > 1:
-                print("fixing yaw: ", yaw[-1], yaw[-2])
                 yaw[-1] = self.fix_topp_yaw(yaw[-1], yaw[-2])
-                print("fixed yaw: ", yaw[-1])
-            
+
         return x, y, z, yaw
 
     def pose_cb(self, msg):
@@ -215,9 +218,7 @@ class ToppTracker:
 
             # Fix Toppra orientation, at this point atleast two points are in trajectory
             if len(yaw) > 1:           
-                print("fixing yaw: ", yaw[-1], yaw[-2])
                 yaw[-1] = self.fix_topp_yaw(yaw[-1], yaw[-2])
-                print("fixed yaw: ", yaw[-1])
                 
         
         for x_,y_,z_,yaw_ in zip(x, y, z, yaw):
@@ -270,7 +271,14 @@ class ToppTracker:
         path_msg = Path()
         path_msg.header.stamp = rospy.Time.now()
         path_msg.header.frame_id = msg.header.frame_id
-        for point in self.trajectory.points:
+
+        self.trajectory_pose_arr.header.stamp = rospy.Time.now()
+        self.trajectory_pose_arr.header.frame_id = msg.header.frame_id
+        self.trajectory_pose_arr.poses = []
+        self.trajectory_index = 0
+
+        for i, point in enumerate(self.trajectory.points):
+
             path_point = PoseStamped()
             path_point.header.stamp = rospy.Time.now()
             path_point.header.frame_id = msg.header.frame_id
@@ -282,6 +290,12 @@ class ToppTracker:
             path_point.pose.orientation.z = point.transforms[0].rotation.z
             path_point.pose.orientation.w = point.transforms[0].rotation.w
             path_msg.poses.append(path_point)
+
+            if i % 10 != 0:
+                continue
+
+            self.trajectory_pose_arr.poses.append(path_point.pose)
+
         self.path_pub.publish(path_msg)
         
 
@@ -353,6 +367,14 @@ class ToppTracker:
             # Publish trajectory point
             self.point_pub.publish(self.trajectory.points.pop(0))
             self.publish_tracker_status(TrackerStatus.active)
+
+            if len(self.trajectory_pose_arr.poses) > 0 and \
+                self.trajectory_index % 10 == 0:
+                self.trajectory_pose_arr.poses.pop(0)
+            
+            self.trajectory_pose_arr.header.stamp = rospy.Time.now()
+            self.trajectory_pose_arr_pub.publish(self.trajectory_pose_arr)            
+            self.trajectory_index = self.trajectory_index + 1
             rospy.sleep(self.rate)
 
 if __name__ == "__main__":
