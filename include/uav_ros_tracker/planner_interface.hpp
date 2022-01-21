@@ -116,7 +116,6 @@ public:
 
     uav_ros_msgs::Waypoint new_wp;
     new_wp.pose                 = transformed_pose;
-    new_wp.pose.pose.position.z = waypoint.pose.pose.position.z;
     new_wp.waiting_time         = waypoint.waiting_time;
     return new_wp;
   }
