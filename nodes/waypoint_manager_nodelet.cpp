@@ -86,8 +86,8 @@ private:
   ros::Publisher m_waypoint_array_pub;
 
   // Initialize transform helpers
-  tf2_ros::Buffer            m_buffer;
-  tf2_ros::TransformListener m_transform_listener{ m_buffer };
+  std::unique_ptr<tf2_ros::Buffer>            m_buffer_ptr;
+  std::unique_ptr<tf2_ros::TransformListener> m_transform_listener_ptr;
 };
 }// namespace uav_ros_tracker
 
@@ -98,6 +98,9 @@ void uav_ros_tracker::WaypointManager::onInit()
 
   param_util::getParamOrThrow(nh_private, "tracking_frame", m_tracking_frame);
   param_util::getParamOrThrow(nh_private, "waypoint_frames", m_waypoint_frames);
+
+  m_buffer_ptr             = std::make_unique<tf2_ros::Buffer>();
+  m_transform_listener_ptr = std::make_unique<tf2_ros::TransformListener>(*m_buffer_ptr);
 
   initialize_transform_map();
 
@@ -175,12 +178,12 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
 
       samples_collected = false;
       try {
-        auto trans = m_buffer.lookupTransform(m_tracking_frame, frame, ros::Time(0));
+        auto trans = m_buffer_ptr->lookupTransform(m_tracking_frame, frame, ros::Time(0));
         multitransform_map[frame].push_back(trans);
         ROS_DEBUG("[%s] Got sample %ld for frame %s",
-                 getName().c_str(),
-                 multitransform_map[frame].size(),
-                 frame.c_str());
+                  getName().c_str(),
+                  multitransform_map[frame].size(),
+                  frame.c_str());
       } catch (tf2::TransformException& ex) {
         ROS_FATAL_THROTTLE(2.0,
                            "[%s] Unable to find transform to %s with message: %s",
@@ -217,7 +220,7 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
     final_transform.transform.rotation = ros_convert::calculate_quaternion(total_heading);
 
     ROS_DEBUG_STREAM(getName() << " Translation for frame " << frame
-                              << " is: " << final_transform);
+                               << " is: " << final_transform);
     m_transform_map[frame] = final_transform;
   }
 
@@ -226,7 +229,7 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
   m_transform_map[m_tracking_frame].transform.rotation.w = 1;
 
   ROS_DEBUG_STREAM(getName() << "Translation for frame " << m_tracking_frame
-                            << " is: " << m_transform_map[m_tracking_frame]);
+                             << " is: " << m_transform_map[m_tracking_frame]);
 }
 
 void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* unused */)
