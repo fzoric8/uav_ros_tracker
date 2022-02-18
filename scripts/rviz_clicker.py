@@ -83,7 +83,7 @@ class RvizClicker:
         # Set position
         waypoint.pose.pose.position.x = msg.pose.position.x
         waypoint.pose.pose.position.y = msg.pose.position.y
-        waypoint.pose.pose.position.z = self.WaypointHeight - self.ClickerToMapZ
+        waypoint.pose.pose.position.z = self.WaypointHeight + self.ClickerToMapZ
         
         # Set orientation
         waypoint.pose.pose.orientation.x = msg.pose.orientation.x
@@ -105,7 +105,7 @@ class RvizClicker:
         # Set position
         waypoint.pose.pose.position.x = msg.point.x
         waypoint.pose.pose.position.y = msg.point.y
-        waypoint.pose.pose.position.z = self.WaypointHeight - self.ClickerToMapZ
+        waypoint.pose.pose.position.z = self.WaypointHeight + self.ClickerToMapZ
         
         # Set orientation
         wp_quaternion = quaternion_from_euler(0, 0, self.WaypointYaw)
