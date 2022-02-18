@@ -5,8 +5,14 @@
 
 using namespace uav_ros_tracker;
 
-bool WaypointPublisher::initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private)
+bool WaypointPublisher::initialize(
+  ros::NodeHandle&                                                 nh,
+  ros::NodeHandle&                                                 nh_private,
+  std::unordered_map<std::string, geometry_msgs::TransformStamped> transform_map,
+  std::string                                                      tracking_frame)
 {
+  m_tracking_frame   = std::move(tracking_frame);
+  m_transform_map    = std::move(transform_map);
   m_nh               = nh;
   m_tracker_pose_pub = m_nh.advertise<geometry_msgs::PoseStamped>("pose_in", 1);
   return true;
@@ -115,8 +121,8 @@ uav_ros_msgs::WaypointStatus WaypointPublisher::getWaypointStatus(
 void WaypointPublisher::addWaypoint(const uav_ros_msgs::Waypoint& waypoint)
 {
   std::lock_guard<std::mutex> lock(m_waypoint_buffer_mutex);
-  m_waypoint_buffer.emplace_back(
-    boost::make_shared<uav_ros_msgs::Waypoint>(std::move(waypoint)));
+  m_waypoint_buffer.emplace_back(boost::make_shared<uav_ros_msgs::Waypoint>(
+    transform_waypoint(waypoint, m_transform_map, m_tracking_frame)));
 
   ROS_INFO("[%s] Waypoint Added [%.2f, %.2f, %.2f]",
            NAME,
@@ -173,12 +179,10 @@ geometry_msgs::PoseArray WaypointPublisher::getWaypointArray()
   return waypoint_array;
 }
 
-double WaypointPublisher::calc_distance(const nav_msgs::Odometry&     odom,
-                                        const uav_ros_msgs::Waypoint& waypoint)
+void WaypointPublisher::updateTransformMap(
+  std::unordered_map<std::string, geometry_msgs::TransformStamped> transform_map)
 {
-  return sqrt(pow(odom.pose.pose.position.x - waypoint.pose.pose.position.x, 2)
-              + pow(odom.pose.pose.position.y - waypoint.pose.pose.position.y, 2)
-              + pow(odom.pose.pose.position.z - waypoint.pose.pose.position.z, 2));
+  // TODO: Provide implementation
 }
 
 #include <pluginlib/class_list_macros.h>

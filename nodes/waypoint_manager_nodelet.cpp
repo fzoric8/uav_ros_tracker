@@ -23,7 +23,6 @@
 #include <uav_ros_lib/param_util.hpp>
 #include <uav_ros_lib/ros_convert.hpp>
 #include <geometry_msgs/TransformStamped.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 using planner_loader_t = pluginlib::ClassLoader<uav_ros_tracker::planner_interface>;
 
@@ -40,6 +39,7 @@ private:
   static constexpr auto THROTTLE_S     = 5;
 
   // Planner plugin
+  std::mutex                                            m_planner_ptr_mutex;
   std::unique_ptr<planner_loader_t>                     m_planner_loader_ptr;
   boost::shared_ptr<uav_ros_tracker::planner_interface> m_planner_ptr;
 
@@ -79,10 +79,15 @@ private:
   ros::Timer m_waypoint_timer;
   void       waypoint_loop(const ros::TimerEvent& /* unused */);
 
+  ros::Timer m_update_transform_map;
+  void       update_transform_map_loop(const ros::TimerEvent& /* unused */);
+
   ros::Publisher m_waypoint_status_pub;
   ros::Publisher m_waypoint_array_pub;
 
-  uav_ros_msgs::Waypoint transform_waypoint(const uav_ros_msgs::Waypoint& waypoint);
+  // Initialize transform helpers
+  std::unique_ptr<tf2_ros::Buffer>            m_buffer_ptr;
+  std::unique_ptr<tf2_ros::TransformListener> m_transform_listener_ptr;
 };
 }// namespace uav_ros_tracker
 
@@ -93,6 +98,9 @@ void uav_ros_tracker::WaypointManager::onInit()
 
   param_util::getParamOrThrow(nh_private, "tracking_frame", m_tracking_frame);
   param_util::getParamOrThrow(nh_private, "waypoint_frames", m_waypoint_frames);
+
+  m_buffer_ptr             = std::make_unique<tf2_ros::Buffer>();
+  m_transform_listener_ptr = std::make_unique<tf2_ros::TransformListener>(*m_buffer_ptr);
 
   initialize_transform_map();
 
@@ -105,8 +113,14 @@ void uav_ros_tracker::WaypointManager::onInit()
     "uav_ros_tracker", "uav_ros_tracker::planner_interface");
   m_planner_ptr = m_planner_loader_ptr->createUniqueInstance(planner_name);
 
+  if (m_planner_ptr == nullptr) {
+    ROS_ERROR("[WaypointManager] Unable to load plugin %s", planner_name.c_str());
+    ros::shutdown();
+  }
+
   // Initialize the planner
-  auto init_success = m_planner_ptr->initialize(nh, nh_private);
+  auto init_success =
+    m_planner_ptr->initialize(nh, nh_private, m_transform_map, m_tracking_frame);
   if (!init_success) {
     ROS_ERROR("[WaypointManager] planner initialization unsucessful!");
     ros::shutdown();
@@ -128,13 +142,24 @@ void uav_ros_tracker::WaypointManager::onInit()
 
   m_is_initialized = true;
   ROS_INFO("[%s] Initialized.", this->getName().c_str());
+
+  m_update_transform_map =
+    nh.createTimer(ros::Rate(10), &WaypointManager::update_transform_map_loop, this);
+}
+
+void uav_ros_tracker::WaypointManager::update_transform_map_loop(
+  const ros::TimerEvent& /* unused */)
+{
+  initialize_transform_map();
+  {
+    std::lock_guard<std::mutex> lock(m_planner_ptr_mutex);
+    m_planner_ptr->updateTransformMap(m_transform_map);
+  }
 }
 
 void uav_ros_tracker::WaypointManager::initialize_transform_map()
 {
-  // Initialize transform helpers
-  tf2_ros::Buffer            buffer;
-  tf2_ros::TransformListener transform_listener{ buffer };
+  m_transform_map.clear();
 
   // Collect samples to get the average frame transform
   std::unordered_map<std::string, std::vector<geometry_msgs::TransformStamped>>
@@ -147,18 +172,18 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
     bool samples_collected = true;
     for (const auto& frame : m_waypoint_frames) {
       if (multitransform_map[frame].size() == SAMPLE_COUNT) {
-        ROS_INFO("[%s] Got all samples for frame %s", getName().c_str(), frame.c_str());
+        ROS_DEBUG("[%s] Got all samples for frame %s", getName().c_str(), frame.c_str());
         continue;
       }
 
       samples_collected = false;
       try {
-        auto trans = buffer.lookupTransform(m_tracking_frame, frame, ros::Time(0));
+        auto trans = m_buffer_ptr->lookupTransform(m_tracking_frame, frame, ros::Time(0));
         multitransform_map[frame].push_back(trans);
-        ROS_INFO("[%s] Got sample %ld for frame %s",
-                 getName().c_str(),
-                 multitransform_map[frame].size(),
-                 frame.c_str());
+        ROS_DEBUG("[%s] Got sample %ld for frame %s",
+                  getName().c_str(),
+                  multitransform_map[frame].size(),
+                  frame.c_str());
       } catch (tf2::TransformException& ex) {
         ROS_FATAL_THROTTLE(2.0,
                            "[%s] Unable to find transform to %s with message: %s",
@@ -194,8 +219,8 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
     final_transform.transform.translation.z = total_translation.z();
     final_transform.transform.rotation = ros_convert::calculate_quaternion(total_heading);
 
-    ROS_INFO_STREAM(getName() << " Translation for frame " << frame
-                              << " is: " << final_transform);
+    ROS_DEBUG_STREAM(getName() << " Translation for frame " << frame
+                               << " is: " << final_transform);
     m_transform_map[frame] = final_transform;
   }
 
@@ -203,8 +228,8 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
   m_transform_map[m_tracking_frame] = geometry_msgs::TransformStamped{};
   m_transform_map[m_tracking_frame].transform.rotation.w = 1;
 
-  ROS_INFO_STREAM(getName() << "Translation for frame " << m_tracking_frame
-                            << " is: " << m_transform_map[m_tracking_frame]);
+  ROS_DEBUG_STREAM(getName() << "Translation for frame " << m_tracking_frame
+                             << " is: " << m_transform_map[m_tracking_frame]);
 }
 
 void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* unused */)
@@ -237,17 +262,30 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
     tracking_enabled = m_tracker_status == TRACKER_READY;
   }
 
-  auto [wp_published, message, current_waypoint] =
-    m_planner_ptr->publishWaypoint(current_odometry, tracking_enabled, control_enabled);
+  geometry_msgs::PoseArray     waypoint_array_msg;
+  uav_ros_msgs::WaypointStatus wp_status;
+  bool                         wp_published;
+  std::string                  message;
+  uav_ros_msgs::WaypointPtr    current_waypoint;
 
-  // Publish waypoint array
-  auto waypoint_array_msg            = m_planner_ptr->getWaypointArray();
+  {
+    std::lock_guard<std::mutex> lock(m_planner_ptr_mutex);
+    auto [ret_wp_published, ret_message, ret_current_waypoint] =
+      m_planner_ptr->publishWaypoint(current_odometry, tracking_enabled, control_enabled);
+    wp_published     = ret_wp_published;
+    message          = ret_message;
+    current_waypoint = ret_current_waypoint;
+
+    // Publish waypoint array
+    waypoint_array_msg = m_planner_ptr->getWaypointArray();
+
+    // Create a status message
+    wp_status = m_planner_ptr->getWaypointStatus(current_odometry);
+  }
+
   waypoint_array_msg.header.frame_id = m_tracking_frame;
   waypoint_array_msg.header.stamp    = ros::Time::now();
   m_waypoint_array_pub.publish(waypoint_array_msg);
-
-  // Create a status message
-  auto wp_status = m_planner_ptr->getWaypointStatus(current_odometry);
   m_waypoint_status_pub.publish(wp_status);
 
   // No waypoint is published
@@ -277,8 +315,7 @@ void uav_ros_tracker::WaypointManager::waypoint_cb(const uav_ros_msgs::WaypointP
     ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Nodelet not initialized.", getName().c_str());
     return;
   }
-  auto transformed_wp = transform_waypoint(*msg);
-  m_planner_ptr->addWaypoint(transformed_wp);
+  m_planner_ptr->addWaypoint(*msg);
 }
 
 void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::WaypointsPtr msg)
@@ -287,12 +324,7 @@ void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::Waypoint
     ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Nodelet not initialized.", getName().c_str());
     return;
   }
-
-  uav_ros_msgs::Waypoints transformed_wps;
-  for (const auto& wp : msg->waypoints) {
-    transformed_wps.waypoints.push_back(transform_waypoint(wp));
-  }
-  m_planner_ptr->addWaypoints(transformed_wps);
+  m_planner_ptr->addWaypoints(*msg);
 }
 
 void uav_ros_tracker::WaypointManager::tracker_status_cb(
@@ -323,28 +355,6 @@ bool uav_ros_tracker::WaypointManager::clear_waypoints_cb(
   resp.success = true;
   resp.message = "Waypoints successfully cleared";
   return true;
-}
-
-uav_ros_msgs::Waypoint uav_ros_tracker::WaypointManager::transform_waypoint(
-  const uav_ros_msgs::Waypoint& waypoint)
-{
-  auto waypoint_frame = waypoint.pose.header.frame_id;
-  if (m_transform_map.find(waypoint_frame) == m_transform_map.end()) {
-    ROS_WARN("[%s] Waypoint frame %s unrecognized, setting to %s.",
-             getName().c_str(),
-             waypoint_frame.c_str(),
-             m_tracking_frame.c_str());
-    waypoint_frame = m_tracking_frame;
-  }
-
-  geometry_msgs::PoseStamped transformed_pose;
-  tf2::doTransform(waypoint.pose, transformed_pose, m_transform_map[waypoint_frame]);
-
-  uav_ros_msgs::Waypoint new_wp;
-  new_wp.pose                 = transformed_pose;
-  new_wp.pose.pose.position.z = waypoint.pose.pose.position.z;
-  new_wp.waiting_time         = waypoint.waiting_time;
-  return new_wp;
 }
 
 #include <pluginlib/class_list_macros.h>
