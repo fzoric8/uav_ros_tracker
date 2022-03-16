@@ -173,9 +173,11 @@ geometry_msgs::PoseArray WaypointPublisher::getWaypointArray()
   geometry_msgs::PoseArray    waypoint_array;
 
   for (const auto& waypoint : m_waypoint_buffer) {
+    waypoint_array.header.frame_id = waypoint->pose.header.frame_id;
     waypoint_array.poses.push_back(waypoint->pose.pose);
   }
 
+  waypoint_array.header.stamp = ros::Time::now();
   return waypoint_array;
 }
 

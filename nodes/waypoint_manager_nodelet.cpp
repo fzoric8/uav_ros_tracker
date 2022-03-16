@@ -283,8 +283,6 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
     wp_status = m_planner_ptr->getWaypointStatus(current_odometry);
   }
 
-  waypoint_array_msg.header.frame_id = m_tracking_frame;
-  waypoint_array_msg.header.stamp    = ros::Time::now();
   m_waypoint_array_pub.publish(waypoint_array_msg);
   m_waypoint_status_pub.publish(wp_status);
 
