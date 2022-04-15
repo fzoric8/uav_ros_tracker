@@ -178,7 +178,7 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
 
       samples_collected = false;
       try {
-        auto trans = m_buffer_ptr->lookupTransform(m_tracking_frame, frame, ros::Time(0));
+        auto trans = m_buffer_ptr->lookupTransform(m_tracking_frame, frame, ros::Time(0), ros::Duration(1));
         multitransform_map[frame].push_back(trans);
         ROS_DEBUG("[%s] Got sample %ld for frame %s",
                   getName().c_str(),
@@ -283,6 +283,10 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
     wp_status = m_planner_ptr->getWaypointStatus(current_odometry);
   }
 
+  if (waypoint_array_msg.header.frame_id == "") 
+  {
+    waypoint_array_msg.header.frame_id = m_waypoint_frames.front();
+  }
   m_waypoint_array_pub.publish(waypoint_array_msg);
   m_waypoint_status_pub.publish(wp_status);
 
