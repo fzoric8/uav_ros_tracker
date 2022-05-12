@@ -46,6 +46,7 @@ private:
   bool                     m_is_initialized = false;
   std::string              m_tracking_frame;
   bool                     m_override_waypoints;
+  bool                     m_disable_when_grounded;
   std::vector<std::string> m_waypoint_frames;
 
   std::unordered_map<std::string, geometry_msgs::TransformStamped> m_transform_map;
@@ -99,6 +100,7 @@ void uav_ros_tracker::WaypointManager::onInit()
 
   param_util::getParamOrThrow(nh_private, "tracking_frame", m_tracking_frame);
   param_util::getParamOrThrow(nh_private, "override_waypoints", m_override_waypoints);
+  param_util::getParamOrThrow(nh_private, "disable_when_grounded", m_disable_when_grounded);
   param_util::getParamOrThrow(nh_private, "waypoint_frames", m_waypoint_frames);
 
   m_buffer_ptr             = std::make_unique<tf2_ros::Buffer>();
@@ -339,6 +341,22 @@ void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::Waypoint
 
     if (!resp.success) {
       ROS_FATAL("[Waypointmanager::waypoints_cb] - Unable to clear waypoints!");
+      return;
+    }
+  }
+
+  // Disable waypoint manager when grounded
+  if (m_disable_when_grounded) {
+    bool control_enabled = false;
+    {
+      std::lock_guard<std::mutex> lock(m_carrot_status_mutex);
+      control_enabled = m_carrot_status == HOLD;
+    }
+
+    if (!control_enabled) {
+      ROS_FATAL(
+        "[WaypointManager::waypoints_cb] - Sending waypoints is disabled when UAV is "
+        "grounded.");
       return;
     }
   }
