@@ -100,7 +100,8 @@ void uav_ros_tracker::WaypointManager::onInit()
 
   param_util::getParamOrThrow(nh_private, "tracking_frame", m_tracking_frame);
   param_util::getParamOrThrow(nh_private, "override_waypoints", m_override_waypoints);
-  param_util::getParamOrThrow(nh_private, "disable_when_grounded", m_disable_when_grounded);
+  param_util::getParamOrThrow(
+    nh_private, "disable_when_grounded", m_disable_when_grounded);
   param_util::getParamOrThrow(nh_private, "waypoint_frames", m_waypoint_frames);
 
   m_buffer_ptr             = std::make_unique<tf2_ros::Buffer>();
