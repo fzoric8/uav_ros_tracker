@@ -45,6 +45,7 @@ private:
 
   bool                     m_is_initialized = false;
   std::string              m_tracking_frame;
+  bool                     m_override_waypoints;
   std::vector<std::string> m_waypoint_frames;
 
   std::unordered_map<std::string, geometry_msgs::TransformStamped> m_transform_map;
@@ -97,6 +98,7 @@ void uav_ros_tracker::WaypointManager::onInit()
   auto& nh_private = getMTPrivateNodeHandle();
 
   param_util::getParamOrThrow(nh_private, "tracking_frame", m_tracking_frame);
+  param_util::getParamOrThrow(nh_private, "override_waypoints", m_override_waypoints);
   param_util::getParamOrThrow(nh_private, "waypoint_frames", m_waypoint_frames);
 
   m_buffer_ptr             = std::make_unique<tf2_ros::Buffer>();
@@ -178,7 +180,8 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
 
       samples_collected = false;
       try {
-        auto trans = m_buffer_ptr->lookupTransform(m_tracking_frame, frame, ros::Time(0), ros::Duration(1));
+        auto trans = m_buffer_ptr->lookupTransform(
+          m_tracking_frame, frame, ros::Time(0), ros::Duration(1));
         multitransform_map[frame].push_back(trans);
         ROS_DEBUG("[%s] Got sample %ld for frame %s",
                   getName().c_str(),
@@ -283,8 +286,7 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
     wp_status = m_planner_ptr->getWaypointStatus(current_odometry);
   }
 
-  if (waypoint_array_msg.header.frame_id == "") 
-  {
+  if (waypoint_array_msg.header.frame_id == "") {
     waypoint_array_msg.header.frame_id = m_waypoint_frames.front();
   }
   m_waypoint_array_pub.publish(waypoint_array_msg);
@@ -326,6 +328,21 @@ void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::Waypoint
     ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Nodelet not initialized.", getName().c_str());
     return;
   }
+
+  // If override flag is set then clear all existing waypoints before adding new ones
+  if (m_override_waypoints) {
+    std_srvs::SetBool::Request req;
+    req.data = true;
+    std_srvs::SetBool::Response resp;
+
+    clear_waypoints_cb(req, resp);
+
+    if (!resp.success) {
+      ROS_FATAL("[Waypointmanager::waypoints_cb] - Unable to clear waypoints!");
+      return;
+    }
+  }
+
   m_planner_ptr->addWaypoints(*msg);
 }
 
