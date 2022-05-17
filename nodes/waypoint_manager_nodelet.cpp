@@ -23,6 +23,7 @@
 #include <uav_ros_lib/param_util.hpp>
 #include <uav_ros_lib/ros_convert.hpp>
 #include <geometry_msgs/TransformStamped.h>
+#include <uav_ros_lib/median_filter.hpp>
 
 using planner_loader_t = pluginlib::ClassLoader<uav_ros_tracker::planner_interface>;
 
@@ -168,8 +169,8 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
 
   // Collect samples to get the average frame transform
   std::unordered_map<std::string, std::vector<geometry_msgs::TransformStamped>>
-            multitransform_map;
-  const int SAMPLE_COUNT = 10;
+                        multitransform_map;
+  static constexpr auto SAMPLE_COUNT = 100;
   while (ros::ok()) {
     ros::Duration(0.1).sleep();
     ros::spinOnce();
@@ -203,6 +204,11 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
     if (samples_collected) { break; }
   }
 
+  MedianFilter<double, SAMPLE_COUNT> x_filt;
+  MedianFilter<double, SAMPLE_COUNT> y_filt;
+  MedianFilter<double, SAMPLE_COUNT> z_filt;
+  MedianFilter<double, SAMPLE_COUNT> yaw_filt;
+
   // Average out the samples
   for (const auto& [frame, transform_samples] : multitransform_map) {
     double       total_heading = 0;
@@ -212,6 +218,11 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
       tf2::Vector3 translation(transform_sample.transform.translation.x,
                                transform_sample.transform.translation.y,
                                transform_sample.transform.translation.z);
+      x_filt.addSample(transform_sample.transform.translation.x);
+      y_filt.addSample(transform_sample.transform.translation.y);
+      z_filt.addSample(transform_sample.transform.translation.z);
+      yaw_filt.addSample(heading);
+
       total_heading += heading;
       total_translation += translation;
     }
@@ -220,10 +231,11 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
     total_translation /= SAMPLE_COUNT;
 
     geometry_msgs::TransformStamped final_transform;
-    final_transform.transform.translation.x = total_translation.x();
-    final_transform.transform.translation.y = total_translation.y();
-    final_transform.transform.translation.z = total_translation.z();
-    final_transform.transform.rotation = ros_convert::calculate_quaternion(total_heading);
+    final_transform.transform.translation.x = x_filt.getMedian();
+    final_transform.transform.translation.y = y_filt.getMedian();
+    final_transform.transform.translation.z = z_filt.getMedian();
+    final_transform.transform.rotation =
+      ros_convert::calculate_quaternion(yaw_filt.getMedian());
 
     ROS_DEBUG_STREAM(getName() << " Translation for frame " << frame
                                << " is: " << final_transform);
