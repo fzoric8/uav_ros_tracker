@@ -21,6 +21,7 @@ import numpy as np
 
 class TrackerParameters:
     def __init__(self):
+        self.from_odom = False
         self.request_permission = True
         self.velocity = [5, 5, 5, 2.5]
         self.acceleration = [2.75, 2.75, 2.75, 1.5]
@@ -42,6 +43,8 @@ class ToppTracker:
         self.tracker_params.n_gridpoints = rospy.get_param("~topp_tracker/n_gridpoints")
         self.tracker_params.sampling_frequency = rospy.get_param("~topp_tracker/sampling_frequency")
         self.tracker_params.request_permission = rospy.get_param("~topp_tracker/request_permission")
+        self.tracker_params.from_odom  = rospy.get_param("~topp_tracker/from_odom")
+        
         self.rate = 1.0 / self.tracker_params.sampling_frequency
         
         self.tracker_params.velocity[0] = rospy.get_param("~topp_tracker/constraints/velocity/x")
@@ -68,7 +71,12 @@ class ToppTracker:
         self.carrot_trajectory = MultiDOFJointTrajectoryPoint()
         self.carrot_trajectory_recieved = False
         self.carrot_trajectory_sub = rospy.Subscriber("carrot/trajectory", MultiDOFJointTrajectoryPoint, self.carrot_trajectory_cb)
+        self.carrot_pose_sub = rospy.Subscriber("carrot/pose", PoseStamped, self.carrot_pose_cb)
         
+        self.odom_msg = Odometry()
+        self.odom_recieved = False
+        self.odom_sub = rospy.Subscriber("odometry_topic", Odometry, self.odom_cb)
+
         self.point_pub = rospy.Publisher("output/point", MultiDOFJointTrajectoryPoint, queue_size=1)
         self.activity_pub = rospy.Publisher("tracker/status", String, queue_size=1)
         self.path_pub = rospy.Publisher("tracker/path", Path, queue_size=1)
@@ -78,6 +86,23 @@ class ToppTracker:
         self.enable_service = rospy.Service("tracker/enable", SetBool, self.enable_service_cb)
         self.topp_reset = rospy.Service("tracker/reset", Empty, self.reset_service_cb)
         
+    def odom_cb(self, msg):
+        if not self.tracker_params.from_odom:
+            rospy.logfatal_throttle(3.0, "ToppTracker - Odometry recieved but not planning from odom")
+            return
+        
+        rospy.loginfo_throttle(3.0, "ToppTracker - recieved odometry - acting as carrot/trajectory")
+        transform = Transform()
+        transform.translation.x = msg.pose.pose.position.x
+        transform.translation.y = msg.pose.pose.position.y
+        transform.translation.z = msg.pose.pose.position.z
+        transform.rotation = msg.pose.pose.orientation
+
+        self.carrot_trajectory = MultiDOFJointTrajectoryPoint()
+        self.carrot_trajectory.transforms.append(transform)
+        self.odom_recieved = True
+
+
     def reset_service_cb(self, req):
         print("ToppTracker - RESET request recieved")
         self.trajectory = MultiDOFJointTrajectory()
@@ -91,7 +116,26 @@ class ToppTracker:
             self.trajectory_pose_arr.poses = []
             self.trajectory_index = 0
 
+    def carrot_pose_cb(self, msg):
+        if self.tracker_params.from_odom:
+            rospy.logwarn_throttle(3.0, "ToppTracker - Carrot trajectory recieved but planning from odom")
+            return
+
+        transform = Transform()
+        transform.translation.x = msg.pose.position.x
+        transform.translation.y = msg.pose.position.y
+        transform.translation.z = msg.pose.position.z
+        transform.rotation = msg.pose.orientation
+
+        self.carrot_trajectory = MultiDOFJointTrajectoryPoint()
+        self.carrot_trajectory.transforms.append(transform)
+        self.carrot_trajectory_recieved = True
+
     def carrot_trajectory_cb(self, msg):
+        if self.tracker_params.from_odom:
+            rospy.logwarn_throttle(3.0, "ToppTracker - Carrot trajectory recieved but planning from odom")
+            return
+
         self.carrot_trajectory = msg
         self.carrot_trajectory_recieved = True
 
@@ -185,8 +229,13 @@ class ToppTracker:
             self.trajectory = MultiDOFJointTrajectory()
             return
         
-        if not self.carrot_trajectory_recieved:
-            print("ToppTracker - trajectory recieved but carrot unavailable")
+        if not self.carrot_trajectory_recieved and not self.tracker_params.from_odom:
+            rospy.logwarn("ToppTracker - trajectory recieved but carrot unavailable")
+            self.trajectory = MultiDOFJointTrajectory()
+            return
+
+        if not self.odom_recieved and self.tracker_params.from_odom:
+            rospy.logwarn("ToppTracker - trajectory recieved but odom unavailabel")
             self.trajectory = MultiDOFJointTrajectory()
             return
 
@@ -337,8 +386,15 @@ class ToppTracker:
     def run(self):
         while not rospy.is_shutdown():
             
-            if not self.carrot_trajectory_recieved:
+            if not self.tracker_params.from_odom and not self.carrot_trajectory_recieved:
                 rospy.loginfo_throttle(1.0, "ToppTracker - Carrot trajectory unavailable")
+                self.publish_tracker_status(TrackerStatus.off)
+                self.enable_trajectory = False
+                rospy.sleep(self.rate)
+                continue
+
+            if self.tracker_params.from_odom and not self.odom_recieved:
+                rospy.loginfo_throttle(1.0, "ToppTracker - Odom unavailable")
                 self.publish_tracker_status(TrackerStatus.off)
                 self.enable_trajectory = False
                 rospy.sleep(self.rate)
