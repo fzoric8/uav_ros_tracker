@@ -78,6 +78,7 @@ class ToppTracker:
         self.odom_sub = rospy.Subscriber("odometry_topic", Odometry, self.odom_cb)
 
         self.point_pub = rospy.Publisher("output/point", MultiDOFJointTrajectoryPoint, queue_size=1)
+        self.pose_pub = rospy.Publisher("output/pose", PoseStamped, queue_size=1)
         self.activity_pub = rospy.Publisher("tracker/status", String, queue_size=1)
         self.path_pub = rospy.Publisher("tracker/path", Path, queue_size=1)
         self.trajectory_pose_arr_pub = rospy.Publisher("tracker/remaining_trajectory", PoseArray, queue_size=1)
@@ -421,7 +422,22 @@ class ToppTracker:
                 continue
 
             # Publish trajectory point
-            self.point_pub.publish(self.trajectory.points.pop(0))
+            tmp_point = MultiDOFJointTrajectoryPoint()
+            tmp_point = self.trajectory.points.pop(0)
+            self.point_pub.publish(tmp_point)
+
+            # PoseStamped
+            tmp_pose = PoseStamped()
+            tmp_pose.header.stamp = rospy.Time.now()
+            tmp_pose.pose.position.x = tmp_point.transforms[0].translation.x
+            tmp_pose.pose.position.y = tmp_point.transforms[0].translation.y
+            tmp_pose.pose.position.z = tmp_point.transforms[0].translation.z
+            tmp_pose.pose.orientation.x = tmp_point.transforms[0].rotation.x
+            tmp_pose.pose.orientation.y = tmp_point.transforms[0].rotation.y
+            tmp_pose.pose.orientation.z = tmp_point.transforms[0].rotation.z
+            tmp_pose.pose.orientation.w = tmp_point.transforms[0].rotation.w
+
+            self.pose_pub.publish(tmp_pose)
             self.publish_tracker_status(TrackerStatus.active)
 
             if len(self.trajectory_pose_arr.poses) > 0 and \
