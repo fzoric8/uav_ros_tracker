@@ -1,6 +1,7 @@
 <launch>
     <arg name="namespace"           default="$(env UAV_NAMESPACE)"/>
     <arg name="input_trajectory"    default="tracker/input_trajectory"/>
+    <arg name="input_pose"          default="tracker/input_pose"/>
     <arg name="carrot_trajectory"   default="carrot/trajectory"/>
     <arg name="carrot_status"       default="carrot/status"/>
     <arg name="output_point"        default="position_hold/trajectory"/>
@@ -17,6 +18,7 @@
     <node name="toppra_uav_ros_tracker" pkg="uav_ros_tracker" type="topp_tracker.py" 
         ns="$(arg namespace)" output="screen">
         <remap from="tracker/input_trajectory"  to="$(arg input_trajectory)"/>
+        <remap from="tracker/input_pose"        to="$(arg input_pose)"/>
         <remap from="carrot/trajectory"         to="$(arg carrot_trajectory)"/>
         <remap from="carrot/status"             to="$(arg carrot_status)"/>
         <remap from="output/point"              to="$(arg output_point)"/>
