@@ -321,6 +321,8 @@ class ToppTracker:
         path_msg = Path()
         path_msg.header.stamp = rospy.Time.now()
         path_msg.header.frame_id = msg.header.frame_id
+        if len(path_msg.header.frame_id) == 0:
+            path_msg.header.frame_id = "world"
 
         self.trajectory_pose_arr.header.stamp = rospy.Time.now()
         self.trajectory_pose_arr.header.frame_id = msg.header.frame_id
