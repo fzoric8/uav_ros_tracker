@@ -1,2 +1,4 @@
 tracking_frame: eagle/ekf
+override_waypoints: false             # Clear old waypoints when new come in
+disable_when_grounded: false          # Disable waypoints when UAV is grounded
 waypoint_frames: [eagle/carto_raw]

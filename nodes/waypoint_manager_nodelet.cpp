@@ -23,6 +23,7 @@
 #include <uav_ros_lib/param_util.hpp>
 #include <uav_ros_lib/ros_convert.hpp>
 #include <geometry_msgs/TransformStamped.h>
+#include <uav_ros_lib/median_filter.hpp>
 
 using planner_loader_t = pluginlib::ClassLoader<uav_ros_tracker::planner_interface>;
 
@@ -45,6 +46,8 @@ private:
 
   bool                     m_is_initialized = false;
   std::string              m_tracking_frame;
+  bool                     m_override_waypoints;
+  bool                     m_disable_when_grounded;
   std::vector<std::string> m_waypoint_frames;
 
   std::unordered_map<std::string, geometry_msgs::TransformStamped> m_transform_map;
@@ -97,6 +100,9 @@ void uav_ros_tracker::WaypointManager::onInit()
   auto& nh_private = getMTPrivateNodeHandle();
 
   param_util::getParamOrThrow(nh_private, "tracking_frame", m_tracking_frame);
+  param_util::getParamOrThrow(nh_private, "override_waypoints", m_override_waypoints);
+  param_util::getParamOrThrow(
+    nh_private, "disable_when_grounded", m_disable_when_grounded);
   param_util::getParamOrThrow(nh_private, "waypoint_frames", m_waypoint_frames);
 
   m_buffer_ptr             = std::make_unique<tf2_ros::Buffer>();
@@ -163,8 +169,8 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
 
   // Collect samples to get the average frame transform
   std::unordered_map<std::string, std::vector<geometry_msgs::TransformStamped>>
-            multitransform_map;
-  const int SAMPLE_COUNT = 10;
+                        multitransform_map;
+  static constexpr auto SAMPLE_COUNT = 100;
   while (ros::ok()) {
     ros::Duration(0.1).sleep();
     ros::spinOnce();
@@ -178,7 +184,8 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
 
       samples_collected = false;
       try {
-        auto trans = m_buffer_ptr->lookupTransform(m_tracking_frame, frame, ros::Time(0));
+        auto trans = m_buffer_ptr->lookupTransform(
+          m_tracking_frame, frame, ros::Time(0), ros::Duration(1));
         multitransform_map[frame].push_back(trans);
         ROS_DEBUG("[%s] Got sample %ld for frame %s",
                   getName().c_str(),
@@ -197,6 +204,11 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
     if (samples_collected) { break; }
   }
 
+  MedianFilter<double, SAMPLE_COUNT> x_filt;
+  MedianFilter<double, SAMPLE_COUNT> y_filt;
+  MedianFilter<double, SAMPLE_COUNT> z_filt;
+  MedianFilter<double, SAMPLE_COUNT> yaw_filt;
+
   // Average out the samples
   for (const auto& [frame, transform_samples] : multitransform_map) {
     double       total_heading = 0;
@@ -206,6 +218,11 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
       tf2::Vector3 translation(transform_sample.transform.translation.x,
                                transform_sample.transform.translation.y,
                                transform_sample.transform.translation.z);
+      x_filt.addSample(transform_sample.transform.translation.x);
+      y_filt.addSample(transform_sample.transform.translation.y);
+      z_filt.addSample(transform_sample.transform.translation.z);
+      yaw_filt.addSample(heading);
+
       total_heading += heading;
       total_translation += translation;
     }
@@ -214,10 +231,11 @@ void uav_ros_tracker::WaypointManager::initialize_transform_map()
     total_translation /= SAMPLE_COUNT;
 
     geometry_msgs::TransformStamped final_transform;
-    final_transform.transform.translation.x = total_translation.x();
-    final_transform.transform.translation.y = total_translation.y();
-    final_transform.transform.translation.z = total_translation.z();
-    final_transform.transform.rotation = ros_convert::calculate_quaternion(total_heading);
+    final_transform.transform.translation.x = x_filt.getMedian();
+    final_transform.transform.translation.y = y_filt.getMedian();
+    final_transform.transform.translation.z = z_filt.getMedian();
+    final_transform.transform.rotation =
+      ros_convert::calculate_quaternion(yaw_filt.getMedian());
 
     ROS_DEBUG_STREAM(getName() << " Translation for frame " << frame
                                << " is: " << final_transform);
@@ -283,6 +301,9 @@ void uav_ros_tracker::WaypointManager::waypoint_loop(const ros::TimerEvent& /* u
     wp_status = m_planner_ptr->getWaypointStatus(current_odometry);
   }
 
+  if (waypoint_array_msg.header.frame_id == "") {
+    waypoint_array_msg.header.frame_id = m_waypoint_frames.front();
+  }
   m_waypoint_array_pub.publish(waypoint_array_msg);
   m_waypoint_status_pub.publish(wp_status);
 
@@ -322,6 +343,37 @@ void uav_ros_tracker::WaypointManager::waypoints_cb(const uav_ros_msgs::Waypoint
     ROS_INFO_THROTTLE(THROTTLE_S, "[%s] Nodelet not initialized.", getName().c_str());
     return;
   }
+
+  // If override flag is set then clear all existing waypoints before adding new ones
+  if (m_override_waypoints) {
+    std_srvs::SetBool::Request req;
+    req.data = true;
+    std_srvs::SetBool::Response resp;
+
+    clear_waypoints_cb(req, resp);
+
+    if (!resp.success) {
+      ROS_FATAL("[Waypointmanager::waypoints_cb] - Unable to clear waypoints!");
+      return;
+    }
+  }
+
+  // Disable waypoint manager when grounded
+  if (m_disable_when_grounded) {
+    bool control_enabled = false;
+    {
+      std::lock_guard<std::mutex> lock(m_carrot_status_mutex);
+      control_enabled = m_carrot_status == HOLD;
+    }
+
+    if (!control_enabled) {
+      ROS_FATAL(
+        "[WaypointManager::waypoints_cb] - Sending waypoints is disabled when UAV is "
+        "grounded.");
+      return;
+    }
+  }
+
   m_planner_ptr->addWaypoints(*msg);
 }
 
