@@ -45,7 +45,8 @@ install(DIRECTORY include/${PROJECT_NAME}/
 
 # Mark executables and/or libraries for installation
 install(
-  TARGETS waypoint_publisher
+  TARGETS waypoint_publisher waypoint_manager_nodelet mpc_tracker mpc_wrapper
+  mpc_cvxgen
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
@@ -57,5 +58,11 @@ install(
   FILES_MATCHING
   PATTERN "*.hpp"
   PATTERN ".svn" EXCLUDE)
+
+# Mark scripts folder for installation
+install(DIRECTORY scripts 
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  USE_SOURCE_PERMISSIONS
+  )
 
 install(FILES plugins.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
