@@ -52,7 +52,7 @@ int main(int argc, char **argv)
     nh.createTimer(ros::Duration(ros::Rate(10)), [&](const ros::TimerEvent &e) {
       std_msgs::String status_msg;
 
-      if (mpc_tracker->is_tracking()) {
+      if (mpc_tracker->is_active()) {
         status_msg.data = "ACTIVE";
         status_pub.publish(status_msg);
         return;

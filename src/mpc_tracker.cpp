@@ -127,7 +127,7 @@ void uav_ros_tracker::MPCTracker::deactivate()
   set_single_ref_point(
     m_mpc_state(0, 0), m_mpc_state(4, 0), m_mpc_state(8, 0), m_mpc_heading_state(0, 0));
 }
-void uav_ros_tracker::MPCTracker::reset() { ROS_INFO("MPCTracker::reset"); }
+void uav_ros_tracker::MPCTracker::reset() { ROS_INFO("MPCTracker::reset"); deactivate(); }
 
 bool uav_ros_tracker::MPCTracker::is_active() { return m_is_active; }
 bool uav_ros_tracker::MPCTracker::is_tracking() { return m_is_trajectory_tracking; }
@@ -204,7 +204,7 @@ void uav_ros_tracker::MPCTracker::mpc_timer(const ros::TimerEvent & /* unused */
   if (m_is_trajectory_tracking) { interpolate_desired_trajectory(); }
 
   // If trajectory tracking is done and request permission is enabled
-  if (!m_is_trajectory_tracking && m_request_permission) {
+  if (!m_is_trajectory_tracking) {
     nav_msgs::Odometry curr_virtual_odom;
     curr_virtual_odom.pose.pose.position.x = m_mpc_state(0, 0);
     curr_virtual_odom.pose.pose.position.y = m_mpc_state(4, 0);
