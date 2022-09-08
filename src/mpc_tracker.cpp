@@ -94,8 +94,6 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
 
 std::tuple<bool, std::string> uav_ros_tracker::MPCTracker::activate()
 {
-  ROS_INFO("MPCTracker::activate");
-
   if (m_is_active) {
     return { true, "MPCTracker::activate - tracker already active" };
   }
@@ -644,10 +642,13 @@ void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstP
   ROS_INFO("MPCTracker::csv_traj_callback - loading csv trajectory");
   m_is_trajectory_tracking = false;
   m_tracking_timer.stop();
-  set_virtual_uav_state(m_curr_state);
   load_trajectory(csv_trajectory);
 
-  if (!m_request_permission) { activate(); }
+  if (!m_request_permission && !m_is_active) { 
+        set_virtual_uav_state(m_curr_state);
+	auto [success, message] = activate(); 
+ 	ROS_INFO_STREAM(message); 
+  }
 }
 
 void uav_ros_tracker::MPCTracker::trajectory_callback(
@@ -663,21 +664,24 @@ void uav_ros_tracker::MPCTracker::trajectory_callback(
   // activate
   if ((ros::Time::now() - m_last_state_time).toSec() > 0.1) {
     ROS_WARN(
-      "MPCTracker::pose_callaback - rejected because carrot/trajectory is unavailable");
+      "MPCTracker::trajectory_callback - rejected because carrot/trajectory is unavailable");
     return;
   }
 
   if (!m_is_initialized) {
-    ROS_WARN("MPCTracker::pose_callback - not initialized!");
+    ROS_WARN("MPCTracker::trajectory_callback - not initialized!");
     return;
   }
 
   m_is_trajectory_tracking = false;
   m_tracking_timer.stop();
-  set_virtual_uav_state(m_curr_state);
   load_trajectory(*msg);
 
-  if (!m_request_permission) { activate(); }
+  if (!m_request_permission && !m_is_active) { 
+        set_virtual_uav_state(m_curr_state);
+	auto [success, message] = activate(); 
+ 	ROS_INFO_STREAM(message); 
+  }
 }
 
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
@@ -816,13 +820,16 @@ void uav_ros_tracker::MPCTracker::pose_callback(
   m_tracking_timer.stop();
   m_is_trajectory_tracking = false;
 
-  set_virtual_uav_state(m_curr_state);
   set_single_ref_point(msg->pose.position.x,
     msg->pose.position.y,
     msg->pose.position.z,
     ros_convert::calculateYaw(msg->pose.orientation));
   
-  if (!m_request_permission) { activate(); }
+  if (!m_request_permission && !m_is_active) { 
+	set_virtual_uav_state(m_curr_state);
+	auto [success, message] = activate(); 
+ 	ROS_INFO_STREAM(message); 
+  }
 }
 
 void uav_ros_tracker::MPCTracker::load_trajectory(
