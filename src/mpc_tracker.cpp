@@ -217,9 +217,9 @@ void uav_ros_tracker::MPCTracker::mpc_timer(const ros::TimerEvent & /* unused */
     if (trajectory_helper::is_close_to_reference(traj_point, curr_virtual_odom, 0.01)
         && abs(m_mpc_state(1, 0)) < 1e-3 && abs(m_mpc_state(5, 0)) < 1e-3
         && abs(m_mpc_state(9, 0)) < 1e-3 && abs(m_mpc_heading_state(1, 0)) < 1e-3) {
-      ROS_INFO("MPCTracker::mpc_timers - tracking is done!");
-      deactivate();
-      return;
+      ROS_INFO_THROTTLE(5.0, "MPCTracker::mpc_timers - tracking is done!");
+      // deactivate();
+      // return;
     }
   }
 
