@@ -2,7 +2,7 @@ topp_tracker:
   from_odom: False
   sampling_frequency: 100
   n_gridpoints: 500
-  request_permission: True
+  request_permission: False
 
   constraints:
 
