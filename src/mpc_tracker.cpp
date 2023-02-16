@@ -9,7 +9,7 @@
 #include <uav_ros_lib/nonlinear_filters.hpp>
 #include <uav_ros_lib/trajectory/trajectory_helper.hpp>
 
-uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
+uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle& nh) : m_nh(nh)
 {
   initialize_parameters();
 
@@ -23,15 +23,15 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
     false, m_max_iter_heading, m_Q_heading, m_dt1, m_dt2, 0);
 
   // Initialize mpc states
-  m_mpc_state = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
+  m_mpc_state         = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
   m_mpc_heading_state = Eigen::MatrixXd::Zero(m_heading_state_count, 1);
-  m_mpc_u = Eigen::VectorXd::Zero(m_trans_input_count);
-  m_mpc_u_heading = 0;
+  m_mpc_u             = Eigen::VectorXd::Zero(m_trans_input_count);
+  m_mpc_u_heading     = 0;
 
   // Initialize desired trajectory
-  m_desired_traj_x = Eigen::MatrixXd::Zero(m_horizon_len, 1);
-  m_desired_traj_y = Eigen::MatrixXd::Zero(m_horizon_len, 1);
-  m_desired_traj_z = Eigen::MatrixXd::Zero(m_horizon_len, 1);
+  m_desired_traj_x       = Eigen::MatrixXd::Zero(m_horizon_len, 1);
+  m_desired_traj_y       = Eigen::MatrixXd::Zero(m_horizon_len, 1);
+  m_desired_traj_z       = Eigen::MatrixXd::Zero(m_horizon_len, 1);
   m_desired_traj_heading = Eigen::MatrixXd::Zero(m_horizon_len, 1);
 
   // Initialize predicted trajectory
@@ -40,8 +40,8 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
     Eigen::MatrixXd::Zero(m_horizon_len * m_trans_state_count, 1);
 
   m_is_trajectory_tracking = false;
-  m_goto_trajectory_start = false;
-  m_is_initialized = false;
+  m_goto_trajectory_start  = false;
+  m_is_initialized         = false;
 
   // Initialize subscribers
   m_carrot_sub =
@@ -62,11 +62,11 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
   m_curr_state.transforms.front().translation.x = 0;
   m_curr_state.transforms.front().translation.y = 0;
   m_curr_state.transforms.front().translation.z = 0;
-  m_curr_state.transforms.front().rotation.x = 0;
-  m_curr_state.transforms.front().rotation.y = 0;
-  m_curr_state.transforms.front().rotation.z = 0;
-  m_curr_state.transforms.front().rotation.w = 1;
-  
+  m_curr_state.transforms.front().rotation.x    = 0;
+  m_curr_state.transforms.front().rotation.y    = 0;
+  m_curr_state.transforms.front().rotation.z    = 0;
+  m_curr_state.transforms.front().rotation.w    = 1;
+
   // Initialize publishers
   m_traj_point_pub =
     m_nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("position_command", 1);
@@ -94,9 +94,7 @@ uav_ros_tracker::MPCTracker::MPCTracker(ros::NodeHandle &nh) : m_nh(nh)
 
 std::tuple<bool, std::string> uav_ros_tracker::MPCTracker::activate()
 {
-  if (m_is_active) {
-    return { true, "MPCTracker::activate - tracker already active" };
-  }
+  if (m_is_active) { return { true, "MPCTracker::activate - tracker already active" }; }
 
   if (!m_is_initialized) {
     return { false, "MPCTracker::activate - odometry callback missing!" };
@@ -116,21 +114,25 @@ std::tuple<bool, std::string> uav_ros_tracker::MPCTracker::activate()
 void uav_ros_tracker::MPCTracker::deactivate()
 {
   ROS_INFO("MPCTracker::deactivate");
-  m_is_active = false;
+  m_is_active              = false;
   m_is_trajectory_tracking = false;
-  m_trajectory_idx = 0;
+  m_trajectory_idx         = 0;
   m_tracking_timer.stop();
 
   set_virtual_uav_state(m_curr_state);
   set_single_ref_point(
     m_mpc_state(0, 0), m_mpc_state(4, 0), m_mpc_state(8, 0), m_mpc_heading_state(0, 0));
 }
-void uav_ros_tracker::MPCTracker::reset() { ROS_INFO("MPCTracker::reset"); deactivate(); }
+void uav_ros_tracker::MPCTracker::reset()
+{
+  ROS_INFO("MPCTracker::reset");
+  deactivate();
+}
 
 bool uav_ros_tracker::MPCTracker::is_active() { return m_is_active; }
 bool uav_ros_tracker::MPCTracker::is_tracking() { return m_is_trajectory_tracking; }
 
-void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unused */)
+void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent& /* unused */)
 {
   if (!m_is_active) {
     ROS_WARN_THROTTLE(
@@ -154,28 +156,28 @@ void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unus
 
   if (m_goto_trajectory_start
       && trajectory_helper::is_close_to_reference(
-           first_traj_point, curr_virtual_odom, 0.25)) {
+        first_traj_point, curr_virtual_odom, 0.25)) {
 
     ROS_INFO("MPCTracker::tracking_timer - first point reached");
-    m_goto_trajectory_start = false;
+    m_goto_trajectory_start  = false;
     m_is_trajectory_tracking = true;
   } else if (m_is_trajectory_tracking) {
     m_trajectory_idx++;
   }
 
   ROS_INFO_STREAM_THROTTLE(1.0,
-    "MPCTracker::tracking_timer - [" << m_trajectory_idx << "/" << m_trajectory_size
-                                     << "]");
+                           "MPCTracker::tracking_timer - [" << m_trajectory_idx << "/"
+                                                            << m_trajectory_size << "]");
   if (m_trajectory_idx == m_trajectory_size) {
     m_is_trajectory_tracking = false;
-    m_trajectory_idx = m_trajectory_size - 1;
+    m_trajectory_idx         = m_trajectory_size - 1;
     m_tracking_timer.stop();
     ROS_INFO("MPCTracker::tracking_timer - trajectory tracking done");
   }
 
   geometry_msgs::PoseStamped debug_traj_ref;
   debug_traj_ref.header.frame_id = m_frame_id;
-  debug_traj_ref.header.stamp = ros::Time::now();
+  debug_traj_ref.header.stamp    = ros::Time::now();
   debug_traj_ref.pose.position.x = m_desired_traj_whole_x(m_trajectory_idx);
   debug_traj_ref.pose.position.y = m_desired_traj_whole_y(m_trajectory_idx);
   debug_traj_ref.pose.position.z = m_desired_traj_whole_z(m_trajectory_idx);
@@ -184,7 +186,7 @@ void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent & /* unus
   m_curr_traj_point_debug_pub.publish(debug_traj_ref);
 }
 
-void uav_ros_tracker::MPCTracker::mpc_timer(const ros::TimerEvent & /* unused */)
+void uav_ros_tracker::MPCTracker::mpc_timer(const ros::TimerEvent& /* unused */)
 {
   if (!m_is_initialized) {
     ROS_INFO_THROTTLE(1.0, "MPCTracker::mpc_timers - not initialized");
@@ -241,26 +243,26 @@ void uav_ros_tracker::MPCTracker::publish_command_reference()
 
   // Concstruct the pose command
   geometry_msgs::PoseStamped virtual_uav_pose;
-  virtual_uav_pose.header.frame_id = m_frame_id;
-  virtual_uav_pose.header.stamp = ros::Time::now();
-  virtual_uav_pose.pose.position.x = m_curr_state.transforms.front().translation.x;
-  virtual_uav_pose.pose.position.y = m_curr_state.transforms.front().translation.y;
-  virtual_uav_pose.pose.position.z = m_curr_state.transforms.front().translation.z;
+  virtual_uav_pose.header.frame_id  = m_frame_id;
+  virtual_uav_pose.header.stamp     = ros::Time::now();
+  virtual_uav_pose.pose.position.x  = m_curr_state.transforms.front().translation.x;
+  virtual_uav_pose.pose.position.y  = m_curr_state.transforms.front().translation.y;
+  virtual_uav_pose.pose.position.z  = m_curr_state.transforms.front().translation.z;
   virtual_uav_pose.pose.orientation = m_curr_state.transforms.front().rotation;
 
   if (is_state_finite) {
     // TODO: Make a msg to accomodate jerk commands
     trajectory_point_ref.transforms.front().translation.x = m_mpc_state(0, 0);
-    trajectory_point_ref.velocities.front().linear.x = m_mpc_state(1, 0);
-    trajectory_point_ref.accelerations.front().linear.x = m_mpc_state(2, 0);
+    trajectory_point_ref.velocities.front().linear.x      = m_mpc_state(1, 0);
+    trajectory_point_ref.accelerations.front().linear.x   = m_mpc_state(2, 0);
 
     trajectory_point_ref.transforms.front().translation.y = m_mpc_state(4, 0);
-    trajectory_point_ref.velocities.front().linear.y = m_mpc_state(5, 0);
-    trajectory_point_ref.accelerations.front().linear.y = m_mpc_state(6, 0);
+    trajectory_point_ref.velocities.front().linear.y      = m_mpc_state(5, 0);
+    trajectory_point_ref.accelerations.front().linear.y   = m_mpc_state(6, 0);
 
     trajectory_point_ref.transforms.front().translation.z = m_mpc_state(8, 0);
-    trajectory_point_ref.velocities.front().linear.z = m_mpc_state(9, 0);
-    trajectory_point_ref.accelerations.front().linear.z = m_mpc_state(10, 0);
+    trajectory_point_ref.velocities.front().linear.z      = m_mpc_state(9, 0);
+    trajectory_point_ref.accelerations.front().linear.z   = m_mpc_state(10, 0);
 
     virtual_uav_pose.pose.position.x = m_mpc_state(0, 0);
     virtual_uav_pose.pose.position.y = m_mpc_state(4, 0);
@@ -269,13 +271,13 @@ void uav_ros_tracker::MPCTracker::publish_command_reference()
   } else {
     ROS_ERROR_THROTTLE(
       1.0, "MPCTracker::publish_command_reference - MPC state is not finite.");
-    trajectory_point_ref.velocities.front().linear.x = 0;
+    trajectory_point_ref.velocities.front().linear.x    = 0;
     trajectory_point_ref.accelerations.front().linear.x = 0;
 
-    trajectory_point_ref.velocities.front().linear.y = 0;
+    trajectory_point_ref.velocities.front().linear.y    = 0;
     trajectory_point_ref.accelerations.front().linear.y = 0;
 
-    trajectory_point_ref.velocities.front().linear.z = 0;
+    trajectory_point_ref.velocities.front().linear.z    = 0;
     trajectory_point_ref.accelerations.front().linear.z = 0;
   }
 
@@ -290,12 +292,12 @@ void uav_ros_tracker::MPCTracker::publish_command_reference()
     // TODO: Make a message to accomodate angular jerk commands
     trajectory_point_ref.transforms.front().rotation =
       ros_convert::calculate_quaternion(m_mpc_heading_state(0, 0));
-    trajectory_point_ref.velocities.front().angular.z = m_mpc_heading_state(1, 0);
+    trajectory_point_ref.velocities.front().angular.z    = m_mpc_heading_state(1, 0);
     trajectory_point_ref.accelerations.front().angular.z = m_mpc_heading_state(2, 0);
 
     virtual_uav_pose.pose.orientation = trajectory_point_ref.transforms.front().rotation;
   } else {
-    trajectory_point_ref.velocities.front().angular.z = 0;
+    trajectory_point_ref.velocities.front().angular.z    = 0;
     trajectory_point_ref.accelerations.front().angular.z = 0;
   }
 
@@ -308,9 +310,9 @@ void uav_ros_tracker::MPCTracker::publish_command_reference()
 
 void uav_ros_tracker::MPCTracker::calculate_mpc()
 {
-  double iters_z = 0;
-  double iters_x = 0;
-  double iters_y = 0;
+  double iters_z       = 0;
+  double iters_x       = 0;
+  double iters_y       = 0;
   double iters_heading = 0;
 
   // Get newest tracker parasm
@@ -324,23 +326,27 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
 
   // Set the z-axis initial state
   Eigen::MatrixXd initial_z = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
-  initial_z(0, 0) = m_mpc_state(8, 0);
-  initial_z(1, 0) = m_mpc_state(9, 0);
-  initial_z(2, 0) = m_mpc_state(10, 0);
-  initial_z(3, 0) = m_mpc_state(11, 0);
+  initial_z(0, 0)           = m_mpc_state(8, 0);
+  initial_z(1, 0)           = m_mpc_state(9, 0);
+  initial_z(2, 0)           = m_mpc_state(10, 0);
+  initial_z(3, 0)           = m_mpc_state(11, 0);
 
   // Set z solver inputs
   m_solver_z->setVelQ(0);
+  if (m_is_breaking_z && !m_is_trajectory_tracking) {
+    m_solver_z->setVelQ(m_constraints.Q_vel_breaking);
+  }
+
   m_solver_z->setInitialState(initial_z);
   m_solver_z->loadReference(des_z_filtered);
   m_solver_z->setLimits(constraints.z_velocity,
-    constraints.z_velocity,
-    constraints.z_acceleration,
-    constraints.z_acceleration,
-    constraints.z_jerk,
-    constraints.z_jerk,
-    constraints.z_snap,
-    constraints.z_snap);
+                        constraints.z_velocity,
+                        constraints.z_acceleration,
+                        constraints.z_acceleration,
+                        constraints.z_jerk,
+                        constraints.z_jerk,
+                        constraints.z_snap,
+                        constraints.z_snap);
 
   // Run z solver
   iters_z += m_solver_z->solveCvx();
@@ -355,23 +361,27 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
 
   // Set x-axis initial state
   Eigen::MatrixXd initial_x = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
-  initial_x(0, 0) = m_mpc_state(0, 0);
-  initial_x(1, 0) = m_mpc_state(1, 0);
-  initial_x(2, 0) = m_mpc_state(2, 0);
-  initial_x(3, 0) = m_mpc_state(3, 0);
+  initial_x(0, 0)           = m_mpc_state(0, 0);
+  initial_x(1, 0)           = m_mpc_state(1, 0);
+  initial_x(2, 0)           = m_mpc_state(2, 0);
+  initial_x(3, 0)           = m_mpc_state(3, 0);
 
   // Set x solver inputs
   m_solver_x->setVelQ(0);
+  if (m_is_breaking_x && !m_is_trajectory_tracking) {
+    m_solver_x->setVelQ(m_constraints.Q_vel_breaking);
+  }
+
   m_solver_x->setInitialState(initial_x);
   m_solver_x->loadReference(des_x_filtered);
   m_solver_x->setLimits(constraints.xy_velocity,
-    constraints.xy_velocity,
-    constraints.xy_acceleration,
-    constraints.xy_acceleration,
-    constraints.xy_jerk,
-    constraints.xy_jerk,
-    constraints.xy_snap,
-    constraints.xy_snap);
+                        constraints.xy_velocity,
+                        constraints.xy_acceleration,
+                        constraints.xy_acceleration,
+                        constraints.xy_jerk,
+                        constraints.xy_jerk,
+                        constraints.xy_snap,
+                        constraints.xy_snap);
 
   // Run x solver
   iters_x += m_solver_x->solveCvx();
@@ -382,23 +392,27 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
 
   // Set y-axis initial state
   Eigen::MatrixXd initial_y = Eigen::MatrixXd::Zero(m_trans_state_count, 1);
-  initial_y(0, 0) = m_mpc_state(4, 0);
-  initial_y(1, 0) = m_mpc_state(5, 0);
-  initial_y(2, 0) = m_mpc_state(6, 0);
-  initial_y(3, 0) = m_mpc_state(7, 0);
+  initial_y(0, 0)           = m_mpc_state(4, 0);
+  initial_y(1, 0)           = m_mpc_state(5, 0);
+  initial_y(2, 0)           = m_mpc_state(6, 0);
+  initial_y(3, 0)           = m_mpc_state(7, 0);
 
   // Set y solver inputs
   m_solver_y->setVelQ(0);
+  if (m_is_breaking_y && !m_is_trajectory_tracking) {
+    m_solver_y->setVelQ(m_constraints.Q_vel_breaking);
+  }
+
   m_solver_y->setInitialState(initial_y);
   m_solver_y->loadReference(des_y_filtered);
   m_solver_y->setLimits(constraints.xy_velocity,
-    constraints.xy_velocity,
-    constraints.xy_acceleration,
-    constraints.xy_acceleration,
-    constraints.xy_jerk,
-    constraints.xy_jerk,
-    constraints.xy_snap,
-    constraints.xy_snap);
+                        constraints.xy_velocity,
+                        constraints.xy_acceleration,
+                        constraints.xy_acceleration,
+                        constraints.xy_jerk,
+                        constraints.xy_jerk,
+                        constraints.xy_snap,
+                        constraints.xy_snap);
 
   // Run x solver
   iters_y += m_solver_y->solveCvx();
@@ -417,16 +431,20 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
 
   // Set heading solver inputs
   m_solver_heading->setVelQ(0);
+  if (m_is_breaking_hdg && !m_is_trajectory_tracking) {
+    m_solver_heading->setVelQ(m_constraints.Q_vel_breaking);
+  }
+
   m_solver_heading->setInitialState(m_mpc_heading_state);
   m_solver_heading->loadReference(m_desired_traj_heading);
   m_solver_heading->setLimits(constraints.heading_velocity,
-    constraints.heading_velocity,
-    constraints.heading_acceleration,
-    constraints.heading_acceleration,
-    constraints.heading_jerk,
-    constraints.heading_jerk,
-    constraints.heading_snap,
-    constraints.heading_snap);
+                              constraints.heading_velocity,
+                              constraints.heading_acceleration,
+                              constraints.heading_acceleration,
+                              constraints.heading_jerk,
+                              constraints.heading_jerk,
+                              constraints.heading_snap,
+                              constraints.heading_snap);
 
   // Run heading solver
   iters_heading += m_solver_heading->solveCvx();
@@ -445,19 +463,19 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
 
   mavros_msgs::AttitudeTarget target;
   target.header.stamp = ros::Time::now();
-  target.body_rate.x = m_mpc_u(0);
-  target.body_rate.y = m_mpc_u(1);
-  target.body_rate.z = m_mpc_u_heading;
-  target.thrust = m_mpc_u(2);
+  target.body_rate.x  = m_mpc_u(0);
+  target.body_rate.y  = m_mpc_u(1);
+  target.body_rate.z  = m_mpc_u_heading;
+  target.thrust       = m_mpc_u(2);
   m_attitude_target_debug_pub.publish(target);
 
   // Publish desired trajectory
   geometry_msgs::PoseArray debug_des_filtered;
-  debug_des_filtered.header.stamp = ros::Time::now();
+  debug_des_filtered.header.stamp    = ros::Time::now();
   debug_des_filtered.header.frame_id = m_frame_id;
 
   geometry_msgs::PoseArray debug_des;
-  debug_des.header.stamp = ros::Time::now();
+  debug_des.header.stamp    = ros::Time::now();
   debug_des.header.frame_id = m_frame_id;
 
   for (int i = 0; i < m_horizon_len; i++) {
@@ -487,17 +505,36 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
   publish_predicted_trajectory();
 
   // Assign filtered variables
-  m_desired_traj_filtered_x = des_x_filtered;
-  m_desired_traj_filtered_y = des_y_filtered;
-  m_desired_traj_filtered_z = des_z_filtered;
+  m_desired_traj_filtered_x       = des_x_filtered;
+  m_desired_traj_filtered_y       = des_y_filtered;
+  m_desired_traj_filtered_z       = des_z_filtered;
   m_desired_traj_filtered_heading = m_desired_traj_heading;
+
+  if (m_constraints.enable_breaking) {
+    m_is_breaking_x =
+      (fabs(des_x_filtered(20) - des_x_filtered(m_horizon_len - 1)) <= 1e-1
+       && fabs(des_x_filtered(50) - des_x_filtered(m_horizon_len - 1)) <= 1e-1);
+    m_is_breaking_y =
+      (fabs(des_y_filtered(20) - des_y_filtered(m_horizon_len - 1)) <= 1e-1
+       && fabs(des_y_filtered(30) - des_y_filtered(m_horizon_len - 1)) <= 1e-1);
+    m_is_breaking_z =
+      (fabs(des_z_filtered(20) - des_z_filtered(m_horizon_len - 1)) <= 1e-1
+       && fabs(des_z_filtered(30) - des_z_filtered(m_horizon_len - 1)) <= 1e-1);
+    m_is_breaking_hdg =
+      (fabs(ros_convert::angleDiff(m_desired_traj_heading(10),
+                                   m_desired_traj_heading(m_horizon_len - 1)))
+         <= 0.1
+       && fabs(ros_convert::angleDiff(m_desired_traj_heading(30),
+                                      m_desired_traj_heading(m_horizon_len - 1)))
+            <= 0.1);
+  }
 }
 
 void uav_ros_tracker::MPCTracker::publish_predicted_trajectory()
 {
   // Publish predicted trajectory
   geometry_msgs::PoseArray debug_trajectory_out;
-  debug_trajectory_out.header.stamp = ros::Time::now();
+  debug_trajectory_out.header.stamp    = ros::Time::now();
   debug_trajectory_out.header.frame_id = m_frame_id;
 
   for (int i = 0; i < m_horizon_len; i++) {
@@ -523,7 +560,7 @@ void uav_ros_tracker::MPCTracker::iterate_virtual_uav_model()
   if (m_is_model_first_iter) {
 
     m_model_iterations_last_time = ros::Time::now();
-    m_is_model_first_iter = false;
+    m_is_model_first_iter        = false;
 
   } else {
 
@@ -584,7 +621,7 @@ void uav_ros_tracker::MPCTracker::iterate_virtual_uav_model()
   }
 
 
-  m_mpc_state = m_A * m_mpc_state + m_B * m_mpc_u;
+  m_mpc_state         = m_A * m_mpc_state + m_B * m_mpc_u;
   m_mpc_heading_state = m_A_heading * m_mpc_heading_state + m_B_heading * m_mpc_u_heading;
 
   m_mpc_heading_state(0) = ros_convert::wrapMinMax(m_mpc_heading_state(0), -M_PI, M_PI);
@@ -597,7 +634,7 @@ void uav_ros_tracker::MPCTracker::interpolate_desired_trajectory()
 
     double first_time = m_dt1 + i * m_dt2;
 
-    int first_idx = m_trajectory_idx + floor(first_time / m_trajectory_dt);
+    int first_idx  = m_trajectory_idx + floor(first_time / m_trajectory_dt);
     int second_idx = first_idx + 1;
 
     double interp_coeff = std::fmod(first_time / m_trajectory_dt, 1.0);
@@ -614,7 +651,7 @@ void uav_ros_tracker::MPCTracker::interpolate_desired_trajectory()
   }
 }
 
-void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstPtr &msg)
+void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstPtr& msg)
 {
   // If a lot of time passed from last odom measurement, something is wrong and don't
   // activate
@@ -633,7 +670,7 @@ void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstP
 
   try {
     csv_trajectory = trajectory_helper::trajectory_from_csv(msg->data, m_frame_id, false);
-  } catch (std::runtime_error &e) {
+  } catch (std::runtime_error& e) {
     ROS_ERROR_STREAM(
       "MPCTracker::csv_traj_callback - unable to read trajectory: " << msg->data);
     return;
@@ -644,15 +681,15 @@ void uav_ros_tracker::MPCTracker::csv_traj_callback(const std_msgs::StringConstP
   m_tracking_timer.stop();
   load_trajectory(csv_trajectory);
 
-  if (!m_request_permission && !m_is_active) { 
-        set_virtual_uav_state(m_curr_state);
-	auto [success, message] = activate(); 
- 	ROS_INFO_STREAM(message); 
+  if (!m_request_permission && !m_is_active) {
+    set_virtual_uav_state(m_curr_state);
+    auto [success, message] = activate();
+    ROS_INFO_STREAM(message);
   }
 }
 
 void uav_ros_tracker::MPCTracker::trajectory_callback(
-  const trajectory_msgs::MultiDOFJointTrajectoryConstPtr &msg)
+  const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& msg)
 {
   if (msg->points.empty()) {
     ROS_WARN("MPCTracker::trajectory_callback - no points given");
@@ -664,7 +701,8 @@ void uav_ros_tracker::MPCTracker::trajectory_callback(
   // activate
   if ((ros::Time::now() - m_last_state_time).toSec() > 0.1) {
     ROS_WARN(
-      "MPCTracker::trajectory_callback - rejected because carrot/trajectory is unavailable");
+      "MPCTracker::trajectory_callback - rejected because carrot/trajectory is "
+      "unavailable");
     return;
   }
 
@@ -677,19 +715,19 @@ void uav_ros_tracker::MPCTracker::trajectory_callback(
   m_tracking_timer.stop();
   load_trajectory(*msg);
 
-  if (!m_request_permission && !m_is_active) { 
-        set_virtual_uav_state(m_curr_state);
-	auto [success, message] = activate(); 
- 	ROS_INFO_STREAM(message); 
+  if (!m_request_permission && !m_is_active) {
+    set_virtual_uav_state(m_curr_state);
+    auto [success, message] = activate();
+    ROS_INFO_STREAM(message);
   }
 }
 
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
   uav_ros_tracker::MPCTracker::filter_desired_traj_xy(
-    const Eigen::VectorXd &des_x_trajectory,
-    const Eigen::VectorXd &des_y_trajectory,
-    double max_speed_x,
-    double max_speed_y)
+    const Eigen::VectorXd& des_x_trajectory,
+    const Eigen::VectorXd& des_y_trajectory,
+    double                 max_speed_x,
+    double                 max_speed_y)
 {
   Eigen::MatrixXd filtered_x_trajectory = Eigen::MatrixXd::Zero(m_horizon_len, 1);
   Eigen::MatrixXd filtered_y_trajectory = Eigen::MatrixXd::Zero(m_horizon_len, 1);
@@ -713,7 +751,7 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
       difference_y = des_y_trajectory(i, 0) - filtered_y_trajectory(i - 1, 0);
     }
 
-    double direction_angle = atan2(difference_y, difference_x);
+    double direction_angle  = atan2(difference_y, difference_x);
     double max_dir_sample_x = abs(max_sample_x * cos(direction_angle));
     double max_dir_sample_y = abs(max_sample_y * sin(direction_angle));
 
@@ -740,9 +778,9 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
 
 
 Eigen::MatrixXd uav_ros_tracker::MPCTracker::filter_desired_traj_z(
-  const Eigen::VectorXd &des_z_trajectory,
-  const double max_ascending_speed,
-  const double max_descending_speed)
+  const Eigen::VectorXd& des_z_trajectory,
+  const double           max_ascending_speed,
+  const double           max_descending_speed)
 {
 
   double difference_z;
@@ -790,19 +828,19 @@ Eigen::MatrixXd uav_ros_tracker::MPCTracker::filter_desired_traj_z(
 }
 
 void uav_ros_tracker::MPCTracker::carrot_callback(
-  const trajectory_msgs::MultiDOFJointTrajectoryPointConstPtr &msg)
+  const trajectory_msgs::MultiDOFJointTrajectoryPointConstPtr& msg)
 {
   if (!m_is_initialized) {
     set_virtual_uav_state(*msg);
     set_single_ref_point(
       m_mpc_state(0, 0), m_mpc_state(4, 0), m_mpc_state(8, 0), m_mpc_heading_state(0, 0));
   }
-  m_curr_state = *msg;
+  m_curr_state      = *msg;
   m_last_state_time = ros::Time::now();
 }
 
 void uav_ros_tracker::MPCTracker::pose_callback(
-  const geometry_msgs::PoseStampedConstPtr &msg)
+  const geometry_msgs::PoseStampedConstPtr& msg)
 {
   // If a lot of time passed from last odom measurement, something is wrong and don't
   // activate
@@ -821,19 +859,19 @@ void uav_ros_tracker::MPCTracker::pose_callback(
   m_is_trajectory_tracking = false;
 
   set_single_ref_point(msg->pose.position.x,
-    msg->pose.position.y,
-    msg->pose.position.z,
-    ros_convert::calculateYaw(msg->pose.orientation));
-  
-  if (!m_request_permission && !m_is_active) { 
-	set_virtual_uav_state(m_curr_state);
-	auto [success, message] = activate(); 
- 	ROS_INFO_STREAM(message); 
+                       msg->pose.position.y,
+                       msg->pose.position.z,
+                       ros_convert::calculateYaw(msg->pose.orientation));
+
+  if (!m_request_permission && !m_is_active) {
+    set_virtual_uav_state(m_curr_state);
+    auto [success, message] = activate();
+    ROS_INFO_STREAM(message);
   }
 }
 
 void uav_ros_tracker::MPCTracker::load_trajectory(
-  const trajectory_msgs::MultiDOFJointTrajectory &traj_msg)
+  const trajectory_msgs::MultiDOFJointTrajectory& traj_msg)
 {
   if (!m_is_initialized) {
     ROS_WARN("MPCTracker::load_trajectory - not initialized");
@@ -858,7 +896,8 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   //   max_speed = constraints.z_velocity;
   // }
 
-  auto interpolated_msg = trajectory_helper::interpolate_points(traj_msg,
+  auto interpolated_msg = trajectory_helper::interpolate_points(
+    traj_msg,
     0.8 * sqrt(2.) * m_constraints.xy_velocity * trajectory_dt,
     0.8 * m_constraints.z_velocity * trajectory_dt);
 
@@ -876,7 +915,7 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
 
   // Add all trajectory points
   for (int i = 0; i < trajectory_size; i++) {
-    auto point = interpolated_msg.points.at(i);
+    auto point                = interpolated_msg.points.at(i);
     m_desired_traj_whole_x(i) = point.transforms.front().translation.x;
     m_desired_traj_whole_y(i) = point.transforms.front().translation.y;
     m_desired_traj_whole_z(i) = point.transforms.front().translation.z;
@@ -902,22 +941,22 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   }
 
   set_single_ref_point(m_desired_traj_whole_x(0),
-    m_desired_traj_whole_y(0),
-    m_desired_traj_whole_z(0),
-    m_desired_traj_whole_heading(0));
+                       m_desired_traj_whole_y(0),
+                       m_desired_traj_whole_z(0),
+                       m_desired_traj_whole_heading(0));
 
   // Start the tracking timer
   m_is_trajectory_tracking = false;
-  m_goto_trajectory_start = true;
-  m_trajectory_size = trajectory_size;
-  m_trajectory_idx = 0;
-  m_trajectory_dt = trajectory_dt;
+  m_goto_trajectory_start  = true;
+  m_trajectory_size        = trajectory_size;
+  m_trajectory_idx         = 0;
+  m_trajectory_dt          = trajectory_dt;
   m_tracking_timer.setPeriod(ros::Duration(trajectory_dt));
   m_tracking_timer.start();
 
 
   geometry_msgs::PoseArray debug_trajectory_out;
-  debug_trajectory_out.header.stamp = ros::Time::now();
+  debug_trajectory_out.header.stamp    = ros::Time::now();
   debug_trajectory_out.header.frame_id = m_frame_id;
 
   for (int i = 0; i < trajectory_size; i++) {
@@ -939,7 +978,7 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
 }
 
 void uav_ros_tracker::MPCTracker::set_virtual_uav_state(
-  const trajectory_msgs::MultiDOFJointTrajectoryPoint &msg)
+  const trajectory_msgs::MultiDOFJointTrajectoryPoint& msg)
 {
   m_mpc_state(0, 0) = msg.transforms.front().translation.x;
   m_mpc_state(1, 0) = msg.velocities.front().linear.x;
@@ -951,12 +990,12 @@ void uav_ros_tracker::MPCTracker::set_virtual_uav_state(
   m_mpc_state(6, 0) = 0;
   m_mpc_state(7, 0) = 0;
 
-  m_mpc_state(8, 0) = msg.transforms.front().translation.z;
-  m_mpc_state(9, 0) = msg.velocities.front().linear.z;
+  m_mpc_state(8, 0)  = msg.transforms.front().translation.z;
+  m_mpc_state(9, 0)  = msg.velocities.front().linear.z;
   m_mpc_state(10, 0) = 0;
   m_mpc_state(11, 0) = 0;
 
-  auto yaw = ros_convert::calculateYaw(msg.transforms.front().rotation);
+  auto yaw                  = ros_convert::calculateYaw(msg.transforms.front().rotation);
   m_mpc_heading_state(0, 0) = yaw;
   m_mpc_heading_state(1, 0) = msg.velocities.front().angular.z;
   m_mpc_heading_state(2, 0) = 0;
@@ -966,9 +1005,9 @@ void uav_ros_tracker::MPCTracker::set_virtual_uav_state(
 }
 
 void uav_ros_tracker::MPCTracker::set_single_ref_point(double x,
-  double y,
-  double z,
-  double heading)
+                                                       double y,
+                                                       double z,
+                                                       double heading)
 {
   m_desired_traj_x.fill(x);
   m_desired_traj_y.fill(y);
@@ -1019,6 +1058,10 @@ void uav_ros_tracker::MPCTracker::initialize_parameters()
   param_util::getParamOrThrow(nh_private, "solver/z/Q", m_Q_z);
   param_util::getParamOrThrow(nh_private, "solver/heading/Q", m_Q_heading);
   param_util::getParamOrThrow(nh_private, "solver/dt2", m_dt2);
+  param_util::getParamOrThrow(
+    nh_private, "solver/breaking/enabled", m_constraints.enable_breaking);
+  param_util::getParamOrThrow(
+    nh_private, "solver/breaking/Q_vel_breaking", m_constraints.Q_vel_breaking);
 
   // Load solver constraints
   param_util::getParamOrThrow(

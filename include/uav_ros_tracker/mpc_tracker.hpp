@@ -118,6 +118,11 @@ private:
   bool m_request_permission     = true;
   bool m_goto_trajectory_start;
 
+  bool m_is_breaking_x   = false;
+  bool m_is_breaking_y   = false;
+  bool m_is_breaking_z   = false;
+  bool m_is_breaking_hdg = false;
+
   /* Solver parameters */
   int                 m_horizon_len;
   int                 m_max_iter_xy;

@@ -73,6 +73,10 @@ solver:
     max_iterations: 25 # default: 25
     Q: [5000, 0, 0, 0]
 
+  breaking:
+    enabled: true
+    Q_vel_breaking: 2000.0
+
 constraints:
 
   xy:
