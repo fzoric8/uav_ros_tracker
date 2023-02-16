@@ -29,32 +29,32 @@ class MPCTracker
 public:
   /**
    * @brief Construct a new MPCTracker object. Initialize the MPC tracker;
-   * 
-   * @param nh 
+   *
+   * @param nh
    */
   explicit MPCTracker(ros::NodeHandle& nh);
 
   /**
    * @brief Activate the MPCTracker.
-   * 
+   *
    */
   std::tuple<bool, std::string> activate();
 
   /**
    * @brief Deactivate the MPCTracker
-   * 
+   *
    */
   void deactivate();
 
   /**
    * @brief Reset the MPCTracker
-   * 
+   *
    */
   void reset();
 
   /**
    * @brief Check if MPCTracker is active
-   * 
+   *
    * @return true if active
    * @return false otherwise
    */
@@ -62,44 +62,44 @@ public:
 
   /**
    * @brief Check if MPCTracker is tracking
-   * 
+   *
    * @return true if tracking
    * @return false otherwise
    */
   bool is_tracking();
-  
+
 private:
   void initialize_parameters();
 
   /* timer callbacks */
-  void tracking_timer(const ros::TimerEvent &event);
-  void mpc_timer(const ros::TimerEvent &event);
+  void tracking_timer(const ros::TimerEvent& event);
+  void mpc_timer(const ros::TimerEvent& event);
 
   /* topic callbacks */
-  void trajectory_callback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr &msg);
-  void carrot_callback(const trajectory_msgs::MultiDOFJointTrajectoryPointConstPtr &msg);
-  void pose_callback(const geometry_msgs::PoseStampedConstPtr &msg);
-  void csv_traj_callback(const std_msgs::StringConstPtr &msg);
-  
+  void trajectory_callback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& msg);
+  void carrot_callback(const trajectory_msgs::MultiDOFJointTrajectoryPointConstPtr& msg);
+  void pose_callback(const geometry_msgs::PoseStampedConstPtr& msg);
+  void csv_traj_callback(const std_msgs::StringConstPtr& msg);
+
   void publish_command_reference();
   void publish_predicted_trajectory();
 
   void calculate_mpc();
   void iterate_virtual_uav_model();
-  void set_virtual_uav_state(const trajectory_msgs::MultiDOFJointTrajectoryPoint &msg);
+  void set_virtual_uav_state(const trajectory_msgs::MultiDOFJointTrajectoryPoint& msg);
   void set_single_ref_point(double x, double y, double z, double heading);
 
   /* trajectory helper methods */
-  void load_trajectory(const trajectory_msgs::MultiDOFJointTrajectory &traj_msg);
+  void load_trajectory(const trajectory_msgs::MultiDOFJointTrajectory& traj_msg);
   void interpolate_desired_trajectory();
   std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> filter_desired_traj_xy(
-    const Eigen::VectorXd &des_x_trajectory,
-    const Eigen::VectorXd &des_y_trajectory,
-    double max_speed_x,
-    double max_speed_y);
-  Eigen::MatrixXd filter_desired_traj_z(const Eigen::VectorXd &des_z_trajectory,
-    double max_ascending_speed,
-    double max_descending_speed);
+    const Eigen::VectorXd& des_x_trajectory,
+    const Eigen::VectorXd& des_y_trajectory,
+    double                 max_speed_x,
+    double                 max_speed_y);
+  Eigen::MatrixXd filter_desired_traj_z(const Eigen::VectorXd& des_z_trajectory,
+                                        double                 max_ascending_speed,
+                                        double                 max_descending_speed);
 
   /* Solver objects */
   std::unique_ptr<uav_ros_tracker::cvx_wrapper::CvxWrapper> m_solver_x;
@@ -108,26 +108,26 @@ private:
   std::unique_ptr<uav_ros_tracker::cvx_wrapper::CvxWrapper> m_solver_heading;
 
   ros::NodeHandle m_nh;
-  double m_tracker_rate;
-  std::string m_frame_id;
-  
+  double          m_tracker_rate;
+  std::string     m_frame_id;
+
   /* MPCTracker flags */
-  bool m_is_initialized = false;
+  bool m_is_initialized         = false;
   bool m_is_trajectory_tracking = false;
-  bool m_is_active = true;
-  bool m_request_permission = true;
+  bool m_is_active              = true;
+  bool m_request_permission     = true;
   bool m_goto_trajectory_start;
 
   /* Solver parameters */
-  int m_horizon_len;
-  int m_max_iter_xy;
-  int m_max_iter_z;
-  int m_max_iter_heading;
+  int                 m_horizon_len;
+  int                 m_max_iter_xy;
+  int                 m_max_iter_z;
+  int                 m_max_iter_heading;
   std::vector<double> m_Q_xy;
   std::vector<double> m_Q_z;
   std::vector<double> m_Q_heading;
-  double m_dt1;
-  double m_dt2;
+  double              m_dt1;
+  double              m_dt2;
 
   /* Number of states */
   int m_trans_state_count;
@@ -147,13 +147,13 @@ private:
   Eigen::MatrixXd m_B_heading_orig;
 
   ros::Time m_model_iterations_last_time;
-  bool m_is_model_first_iter = true;
+  bool      m_is_model_first_iter = true;
 
   /* Current state of the Virtual UAV */
   Eigen::MatrixXd m_mpc_state;
   Eigen::MatrixXd m_mpc_heading_state;
   Eigen::MatrixXd m_mpc_u;
-  double m_mpc_u_heading;
+  double          m_mpc_u_heading;
 
   /* Current desired trajectory */
   Eigen::MatrixXd m_desired_traj_x;
@@ -176,8 +176,8 @@ private:
   Eigen::MatrixXd m_predicted_heading_trajectory;
 
   /** Trajectory parameters **/
-  int m_trajectory_size;
-  int m_trajectory_idx;
+  int    m_trajectory_size;
+  int    m_trajectory_idx;
   double m_trajectory_dt;
 
   /** Timers **/
@@ -185,12 +185,12 @@ private:
   ros::Timer m_tracking_timer;
 
   /** Subscribers **/
-  ros::Time m_last_state_time;
+  ros::Time                                     m_last_state_time;
   trajectory_msgs::MultiDOFJointTrajectoryPoint m_curr_state;
-  ros::Subscriber m_carrot_sub;
-  ros::Subscriber m_pose_sub;
-  ros::Subscriber m_traj_sub;
-  ros::Subscriber m_csv_traj_sub;
+  ros::Subscriber                               m_carrot_sub;
+  ros::Subscriber                               m_pose_sub;
+  ros::Subscriber                               m_traj_sub;
+  ros::Subscriber                               m_csv_traj_sub;
 
   /** Publishers **/
   ros::Publisher m_traj_point_pub;
@@ -203,6 +203,7 @@ private:
   ros::Publisher m_curr_traj_point_debug_pub;
 
   /* Dynamic Reconfigre */
+  uav_ros_tracker::MPCTrackerParametersConfig m_constraints;
   std::unique_ptr<
     ros_util::ReconfigureHandler<uav_ros_tracker::MPCTrackerParametersConfig>>
     m_reconfigure_handler;

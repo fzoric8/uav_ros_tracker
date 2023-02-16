@@ -44,6 +44,7 @@ int main(int argc, char **argv)
     "carrot/status", 1, [&](const std_msgs::StringConstPtr &msg) {
       carrot_status = msg->data;
       if (mpc_tracker->is_active() && (carrot_status != "HOLD")) {
+        ROS_INFO("[mpc_tracker_node] Carrot status not HOLD, deactivate!");
         mpc_tracker->deactivate();
       }
     });

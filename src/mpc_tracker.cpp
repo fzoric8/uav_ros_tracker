@@ -850,8 +850,6 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   double trajectory_dt = 0.2;
 
   // Interpolate trajectory according to constraints and step size
-  auto constraints = m_reconfigure_handler->getData();
-
   // Trajectory speed - dont generate a max speed trajectory
 
   // if (max_speed > constraints.xy_velocity) {
@@ -861,8 +859,8 @@ void uav_ros_tracker::MPCTracker::load_trajectory(
   // }
 
   auto interpolated_msg = trajectory_helper::interpolate_points(traj_msg,
-    0.8 * sqrt(2.) * constraints.xy_velocity * trajectory_dt,
-    0.8 * constraints.z_velocity * trajectory_dt);
+    0.8 * sqrt(2.) * m_constraints.xy_velocity * trajectory_dt,
+    0.8 * m_constraints.z_velocity * trajectory_dt);
 
   int trajectory_size = interpolated_msg.points.size();
 
@@ -1023,32 +1021,30 @@ void uav_ros_tracker::MPCTracker::initialize_parameters()
   param_util::getParamOrThrow(nh_private, "solver/dt2", m_dt2);
 
   // Load solver constraints
-  uav_ros_tracker::MPCTrackerParametersConfig default_config;
+  param_util::getParamOrThrow(
+    nh_private, "constraints/xy/velocity", m_constraints.xy_velocity);
+  param_util::getParamOrThrow(
+    nh_private, "constraints/xy/acceleration", m_constraints.xy_acceleration);
+  param_util::getParamOrThrow(nh_private, "constraints/xy/jerk", m_constraints.xy_jerk);
+  param_util::getParamOrThrow(nh_private, "constraints/xy/snap", m_constraints.xy_snap);
 
   param_util::getParamOrThrow(
-    nh_private, "constraints/xy/velocity", default_config.xy_velocity);
+    nh_private, "constraints/z/velocity", m_constraints.z_velocity);
   param_util::getParamOrThrow(
-    nh_private, "constraints/xy/acceleration", default_config.xy_acceleration);
-  param_util::getParamOrThrow(nh_private, "constraints/xy/jerk", default_config.xy_jerk);
-  param_util::getParamOrThrow(nh_private, "constraints/xy/snap", default_config.xy_snap);
+    nh_private, "constraints/z/acceleration", m_constraints.z_acceleration);
+  param_util::getParamOrThrow(nh_private, "constraints/z/jerk", m_constraints.z_jerk);
+  param_util::getParamOrThrow(nh_private, "constraints/z/snap", m_constraints.z_snap);
 
   param_util::getParamOrThrow(
-    nh_private, "constraints/z/velocity", default_config.z_velocity);
+    nh_private, "constraints/heading/velocity", m_constraints.heading_velocity);
   param_util::getParamOrThrow(
-    nh_private, "constraints/z/acceleration", default_config.z_acceleration);
-  param_util::getParamOrThrow(nh_private, "constraints/z/jerk", default_config.z_jerk);
-  param_util::getParamOrThrow(nh_private, "constraints/z/snap", default_config.z_snap);
-
+    nh_private, "constraints/heading/acceleration", m_constraints.heading_acceleration);
   param_util::getParamOrThrow(
-    nh_private, "constraints/heading/velocity", default_config.heading_velocity);
+    nh_private, "constraints/heading/jerk", m_constraints.heading_jerk);
   param_util::getParamOrThrow(
-    nh_private, "constraints/heading/acceleration", default_config.heading_acceleration);
-  param_util::getParamOrThrow(
-    nh_private, "constraints/heading/jerk", default_config.heading_jerk);
-  param_util::getParamOrThrow(
-    nh_private, "constraints/heading/snap", default_config.heading_snap);
+    nh_private, "constraints/heading/snap", m_constraints.heading_snap);
 
   m_reconfigure_handler = std::make_unique<
     ros_util::ReconfigureHandler<uav_ros_tracker::MPCTrackerParametersConfig>>(
-    default_config, "mpc_tracker");
+    m_constraints, "mpc_tracker");
 }
