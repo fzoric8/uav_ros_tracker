@@ -527,6 +527,11 @@ void uav_ros_tracker::MPCTracker::calculate_mpc()
        && fabs(ros_convert::angleDiff(m_desired_traj_heading(30),
                                       m_desired_traj_heading(m_horizon_len - 1)))
             <= 0.1);
+  } else {
+    m_is_breaking_x   = false;
+    m_is_breaking_y   = false;
+    m_is_breaking_z   = false;
+    m_is_breaking_hdg = false;
   }
 }
 
