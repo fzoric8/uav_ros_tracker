@@ -169,10 +169,8 @@ void uav_ros_tracker::MPCTracker::tracking_timer(const ros::TimerEvent& /* unuse
                            "MPCTracker::tracking_timer - [" << m_trajectory_idx << "/"
                                                             << m_trajectory_size << "]");
   if (m_trajectory_idx == m_trajectory_size) {
-    m_is_trajectory_tracking = false;
-    m_trajectory_idx         = m_trajectory_size - 1;
-    m_tracking_timer.stop();
     ROS_INFO("MPCTracker::tracking_timer - trajectory tracking done");
+    deactivate();
   }
 
   geometry_msgs::PoseStamped debug_traj_ref;
