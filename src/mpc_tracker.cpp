@@ -568,6 +568,7 @@ void uav_ros_tracker::MPCTracker::iterate_virtual_uav_model()
   } else {
 
     double dt = (ros::Time::now() - m_model_iterations_last_time).toSec();
+    dt = nonlinear_filters::saturation(dt, 0.001, 0.1); 
 
     if (dt > 0.001 && dt < 2.0) {
 
